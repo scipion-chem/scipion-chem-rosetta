@@ -1,8 +1,8 @@
 # **************************************************************************
 # *
-# * Authors:     you (you@yourinstitution.email)
+# * Authors:  Alberto Manuel Parra Pérez (amparraperez@gmail.com)
 # *
-# * your institution
+# * Biocomputing Unit, CNB-CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ class Plugin(pwem.Plugin):
         pass
 
 
-    @classmethod  # Not used and can be deleted. Test
+    @classmethod  #  Test that
     def getEnviron(cls):
         """ Setup the environment variables needed to launch programs from Rosetta """
         environ = pwutils.Environ(os.environ)
@@ -105,7 +105,7 @@ class Plugin(pwem.Plugin):
 
         openbabel_commands = [(installationCmd, OPENBABEL_INSTALLED)]
 
-        envPath = os.environ.get('PATH', "")  # keep path since conda likely in there
+        envPath = os.environ.get('PATH', "")  
         installEnvVars = {'PATH': envPath} if envPath else None
         env.addPackage('openbabel',
                        tar='void.tgz',
@@ -135,7 +135,7 @@ class Plugin(pwem.Plugin):
 
 
 
-    # ---------------------------------- Utils functions to utils.py -----------------------
+    # ---------------------------------- Utils functions  -----------------------
     @staticmethod
     def find(path, pattern):  # This function is analogous to linux find (case of folders)
         paths = []
