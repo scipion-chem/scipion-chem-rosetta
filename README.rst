@@ -37,8 +37,8 @@ You will need to use `Scipion3 <https://scipion-em.github.io/docs/docs/scipion
 
 The independent download of Rosetta software suite by the user is required
 before running the programs.
-The installation path is automatically found between all paths. This path
-or any other of your preference has to be set in *ROSETTA_HOME* in
+The installation path is automatically found between all paths. In case of error, 
+this path or any other of your preference has to be set in *ROSETTA_HOME* in
 *scipion.conf*  file.
 
 We recommend to install the last version of Rosetta, 3.12 .
