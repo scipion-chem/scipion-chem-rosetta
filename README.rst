@@ -57,7 +57,7 @@ The steps to download the Rosetta files are the following ones:
       and integration tests. The source code is located in source/src can be compiled
       with SCons using the following commands (for more details see `getting started with Rosetta
       <https://www.rosettacommons.org/docs/latest/getting_started/Getting-Started#local
-      -installation-and-use-of-rosetta>`_:
+      -installation-and-use-of-rosetta>`_), with opencl as extra to allow to use GPU:
 
     .. code-block::
 
@@ -70,7 +70,7 @@ The steps to download the Rosetta files are the following ones:
 
 2. **Install the plugin in Scipion**
 
-- **Install the stable version**
+- **Install the stable version (Not available yet)**
 
     Through the plugin manager GUI by launching Scipion and following **Configuration** >> **Plugins**
 
