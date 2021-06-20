@@ -50,10 +50,11 @@ class GridAGD(data.EMFile):
 
 class DarcScore(data.EMObject):
     """Score given by DARC to each small molecule file (and its conformers) """
-    def __init__(self, zincID, scoreDarc, **kwargs):
-        data.EMObject.__init__(self)
-        self.zincID = pwobj.String(zincID)
-        self.scoreDarc = pwobj.Float(scoreDarc)
+    def __init__(self, **kwargs):
+        data.EMObject.__init__(self, **kwargs)
+        self.ID = pwobj.String(kwargs.get('ID', None))
+        self.scoreDarc = pwobj.Float(kwargs.get('scoreDarc', None))
+
         # Variable Columns depending on if it is used a electrostatic grid or not
         #  Total_Energy
         #  Interface_Energy
@@ -61,10 +62,9 @@ class DarcScore(data.EMObject):
         #  Total_Pack
         #  Interface_Unsat
         #  Thetalig
-        # self.smallMoleculeFile = pwobj.String(kwargs.get('smallMolFilename', None))
 
-    def getzincID(self):
-        return self.zincID.get()
+    def getID(self):
+        return self.ID.get()
 
     def getScoreDarc(self):
         return self.scoreDarc.get()
