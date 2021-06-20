@@ -34,12 +34,12 @@ at the interface.
 The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 """
 
-#IMPORT
+
+from pyworkflow.utils import Message
 from pyworkflow.protocol import params
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 import pyworkflow.object as pwobj
 from pwem.protocols import EMProtocol
-from pyworkflow.utils import Message
 
 from operator import itemgetter
 import shutil
@@ -55,6 +55,12 @@ from rosetta.objects import (DarcScore, SetScores)
 
 class Rosetta_darc(EMProtocol):
     """
+    This protocol uses a Rosetta suite program (named make_ray_files) to generate
+    a RAY file for the input protein. To generate this ray-file we need to input
+    the protein in PDB format and specify a target residue (or more than one)
+    at the interface.
+
+    The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
     """
     _label = 'DARC'
 
@@ -111,7 +117,7 @@ class Rosetta_darc(EMProtocol):
 
         form.addParam("minimize_output", params.BooleanParam,
                       label="Minimize output complex",
-                      default=True,
+                      default=False,
                       important=True,
                       help="")
 
@@ -150,6 +156,18 @@ class Rosetta_darc(EMProtocol):
                           help='Set the weight of the small molecule when it is moving away from the pocket',
                           expertLevel=LEVEL_ADVANCED)
 
+        runs = form.addGroup("Runs option",  expertLevel=LEVEL_ADVANCED)
+        runs.addParam("cseed", params.BooleanParam,
+                       label='Use Constant Seed',
+                       default=False,
+                       help='Use this option to get reproducible results')
+
+        runs.addParam("seed", params.IntParam,
+                       label='Set seed',
+                       default=1111111,
+                       condition="cseed",
+                       help='Set a integer number as constant seed. The default one is 1111111 ')
+
  # --------------------------- STEPS functions ------------------------------
 
     def _insertAllSteps(self):
@@ -159,17 +177,17 @@ class Rosetta_darc(EMProtocol):
         self._insertFunctionStep('createOutput')
 
     def darc(self):
-        """
+        """ Launch a docking process with Rosetta DARC for each ligand
         """
 
         # Add protein file where the program will generate the rays (REQUIRED)
         pdb_file = self.protein.get().getFileName()
-        #pdb_file_extra = os.path.join(self._getExtraPath(), os.path.basename(pdb_file))
-        #createLink(pdb_file, pdb_file_extra)
 
         # Add set of pdb of the small molecules (REQUIRED)
         ligand_set = self.ligands.get()
 
+        # Save compound with errors during docking
+        compound_Error = []
 
         for ligand in ligand_set:  # Run DARC for each ligand in the set of small molecules (and his conformers)
             # Create the args of the program and add protein file
@@ -177,7 +195,6 @@ class Rosetta_darc(EMProtocol):
             args += " -protein %s" % os.path.abspath(pdb_file)
 
             # Add ligand file
-            #ligand_pdb = self.convertmol2_to_pdb(os.path.abspath(ligand.getFileName()))
             ligand_pdb = ligand.getPDBFileName()
             args += " -ligand %s" % os.path.abspath(ligand_pdb)
 
@@ -228,17 +245,31 @@ class Rosetta_darc(EMProtocol):
             args += " -steric_weight %s" % self.steric_weight.get()
             args += " -extra_point_weight %s" % self.extra_weight.get()
 
+            if self.cseed.get():
+                args += " -run:constant_seed"
+                args += " -run:jran %s" % self.seed.get()
 
-            # Run DARC w/wo GPU
-            if GPU_LIST == 0:
-                Plugin.runRosettaProgram(Plugin.getProgram(DARC), args, cwd=self._getExtraPath())
-            else:
-                args += " -gpu %s" % str(self.gpuList.get())
-                Plugin.runRosettaProgram(Plugin.getProgram(DARC_GPU), args, cwd=self._getExtraPath())
+
+
+            try:
+                # Run DARC w/wo GPU
+                if GPU_LIST == 0:
+                    Plugin.runRosettaProgram(Plugin.getProgram(DARC), args, cwd=self._getExtraPath())
+                else:
+                    args += " -gpu %s" % str(self.gpuList.get())
+                    Plugin.runRosettaProgram(Plugin.getProgram(DARC_GPU), args, cwd=self._getExtraPath())
+
+            except:
+                compound_Error.append(ligand_pdb)
+
+
+
 
 
     def organize_files(self):
-        # DARC build multiple files and their organization is better
+        """
+        DARC build multiple files and their organization is better
+        """
 
         # Move the darc_score.sc to main path of the Protocol
         score_extra = self._getExtraPath("darc_score.sc")
@@ -297,8 +328,9 @@ class Rosetta_darc(EMProtocol):
                     shutil.move(file, os.path.join(self._getExtraPath(), "minimization", "darc_complex", basename))
 
 
+
     def createOutput(self):
-        """Create a set of darc score for each small molecule and ZINC ID"""
+        """Create a set of darc score for each small molecule and ID"""
 
         scores = self._getPath("darc_score.sc")
         outputDarcScore = SetScores().create(path=self._getPath(), suffix='')
@@ -307,10 +339,10 @@ class Rosetta_darc(EMProtocol):
             lines = sc.readlines()
             for line in lines[1:]:
                 sc = line.split("\t")
-                zincID = sc[0]
+                ID = sc[0].split("_")[-1]
                 scoreDarc = sc[1]
 
-                dscore = DarcScore(zincID=zincID, scoreDarc=scoreDarc)
+                dscore = DarcScore(ID=ID, scoreDarc=scoreDarc)
 
                 if self.minimize_output.get():
                     dscore.Total_Energy = pwobj.Float(sc[2])
@@ -323,27 +355,7 @@ class Rosetta_darc(EMProtocol):
                 outputDarcScore.append(dscore)
 
         if outputDarcScore is not None:
-            print(outputDarcScore.getSize())
             self._defineOutputs(DarcScores=outputDarcScore)
             self._defineSourceRelation(self.protein, outputDarcScore)
 
-
-
-
-
-
-    def convertmol2_to_pdb(self, filename):
-        # Use babel to do this
-        fnMol = os.path.split(filename)[1]  # Name of complete file
-        fnRoot = os.path.splitext(fnMol)[0]  # Name without format
-        fnFormat = os.path.splitext(fnMol)[1]  # Format file
-
-        if fnFormat == ".mol2":
-            # Convert mol2 format to pdb
-            args = " -imol2 %s -O %s.pdb" % (os.path.abspath(filename), fnRoot)
-            Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getTmpPath()))
-
-        abs_path = os.path.abspath(self._getTmpPath("%s.pdb" % fnRoot))
-
-        return abs_path
 
