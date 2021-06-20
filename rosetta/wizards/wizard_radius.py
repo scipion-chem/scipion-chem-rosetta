@@ -33,15 +33,8 @@ information such as name and number of residues.
 """
 
 # Imports
-
-import numpy as np
-
-from pwem.emlib.image import ImageHandler
-from pwem.convert import AtomicStructHandler
 from pwem.wizards.wizard import EmWizard
-
 from pwem.wizards.wizards_3d.mask_structure_wizard import MaskStructureWizard
-
 from rosetta.protocols.protocol_generate_grid import Autodock_GridGeneration
 
 
