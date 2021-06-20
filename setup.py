@@ -26,12 +26,12 @@ with open('requirements.txt') as f:
 setup(
     name='scipion-chem-rosetta',  # Required
     version='0.1',  # Required
-    description='Scipion plugin',  # Required
+    description='Scipion plugin in order to use tools provided by Rosetta software suite. Currently it has protocols for the use of the Rosetta DARC docking software',  # Required
     long_description=long_description,  # Optional
-    url='https://github.com/scipion-em/scipion-em-myplugin',  # Optional
+    url='https://github.com/scipion-chem/scipion-chem-rosetta',  # Optional
     author='Alberto M. Parra-Perez',  # Optional
-    author_email='you@yourinstitution.email',  # Optional
-    keywords='scipion cryoem imageprocessing scipion-3.0',  # Optional
+    author_email='amparraperez@gmail.com',  # Optional
+    keywords='scipion docking ppi scipion-3.0 cheminformatics',  # Optional
     packages=find_packages(),
     install_requires=[requirements],
     entry_points={'pyworkflow.plugin': 'rosetta = rosetta'},
