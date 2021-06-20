@@ -37,7 +37,9 @@ from bioinformatics.objects import SetOfSmallMolecules, SmallMolecule
 from rosetta import Plugin
 
 
-def inputArg(fn):
+
+
+def inputArg(fn):  # Input format file (fn)
 
     if fn.endswith('.pdb'):    # Protein Data Bank
         args = "-ipdb"
@@ -61,6 +63,7 @@ def inputArg(fn):
 
 
 def outputArg(fnRoot, format, protocol):
+    # Output format and final file path. OpenBabel recognize the format depending on the file extension
 
     if format == 0:
         fnOut = protocol._getExtraPath(fnRoot + ".pdb")
@@ -81,8 +84,15 @@ def outputArg(fnRoot, format, protocol):
     return fnOut, args
 
 
+
+
+
 class ConvertStructures(EMProtocol):
-    """Convert a set of input ligands or a receptor structure to a specific file format"""
+    """
+    Convert a set of input ligands or a protein structure to a specific file format
+    """
+
+
     _label = 'Convert format'
     _program = ""
 
@@ -93,18 +103,20 @@ class ConvertStructures(EMProtocol):
                        label='Input type')
 
         form.addParam('inputSmallMols', PointerParam, pointerClass="SetOfSmallMolecules", condition='inputType==0',
-                      label='Set of small molecules:', allowsNull=False)
+                      label='Set of small molecules:', allowsNull=False,
+                      help="The allowed format are pdb, cif, mol2, sdf and smi")
 
         form.addParam('outputFormatSmall', EnumParam, default=2, condition='inputType==0',
                        choices=['PDB', 'cif', 'Mol2', 'SDF', 'Smiles'],
                        label='Output format',
                        help = "If you try to convert a 2D format (ex. smi) to 3D format,"
-                              "m you can do this but is wrong")
+                              "you will be able to do this but it is wrong")
 
 
         form.addParam('inputStructure', PointerParam, pointerClass= "AtomStruct",
                       condition='inputType==1',
-                      label='Input structure:', allowsNull=False)
+                      label='Input structure:', allowsNull=False,
+                      help="The allowed format are pdb and cif")
 
         form.addParam('outputFormatTarget', EnumParam, default=2,
                       condition='inputType==1',
@@ -112,7 +124,9 @@ class ConvertStructures(EMProtocol):
                        label='Output format')
 
 
-        # --------------------------- INSERT steps functions --------------------
+
+    # --------------------------- Steps functions --------------------
+
     def _insertAllSteps(self):
         self._insertFunctionStep('convertStep')
 
@@ -121,24 +135,31 @@ class ConvertStructures(EMProtocol):
         if self.inputType==0:  # Small molecules
             outputSmallMolecules = SetOfSmallMolecules().create(path=self._getPath(), suffix='SmallMols')
 
+            error = []  # Save the file paths that could not be transformed
             for mol in self.inputSmallMols.get():
 
-                fnSmall = os.path.abspath(mol.smallMoleculeFile.get())
-                fnRoot = os.path.splitext(os.path.split(fnSmall)[1])[0]
+                try:
+                    # Input file
+                    fnSmall = os.path.abspath(mol.smallMoleculeFile.get())
+                    fnRoot = os.path.splitext(os.path.split(fnSmall)[1])[0]
+                    args = inputArg(fnSmall)
 
-                args = inputArg(fnSmall)
-                fnOut, argout = outputArg(fnRoot, self.outputFormatSmall.get(), self)
+                    # Output file
+                    fnOut, argout = outputArg(fnRoot, self.outputFormatSmall.get(), self)
+                    args += argout
 
-                args += argout
+                    Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+
+                    smallMolecule = SmallMolecule(smallMolFilename=fnOut)
+                    outputSmallMolecules.append(smallMolecule)
+
+                except:
+                    error.append(mol.smallMoleculeFile.get())
 
 
-                Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
-
-
-                smallMolecule = SmallMolecule(smallMolFilename=fnOut)
-                outputSmallMolecules.append(smallMolecule)
 
             if len(outputSmallMolecules) > 0:
+                print("The following entries could not be converted: %s" % error)
                 self._defineOutputs(outputSmallMols=outputSmallMolecules)
                 self._defineSourceRelation(self.inputSmallMols, outputSmallMolecules)
 
@@ -153,15 +174,16 @@ class ConvertStructures(EMProtocol):
 
             Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getPath()))
 
-
             target = AtomStruct(filename=fnOut)
             self._defineOutputs(outputStructure=target)
             self._defineSourceRelation(self.inputStructure, target)
 
 
+    # --------------------------- Summary functions --------------------
 
     def _summary(self):
         summary=[]
+
         if self.inputType.get()==0:
             if self.outputFormatSmall.get() == 0:
                 summary.append('Converted to PDB')
