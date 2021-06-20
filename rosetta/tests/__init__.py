@@ -31,3 +31,4 @@ from .test_ligand_preparation import TestLigandPreparation
 from .test_converter import TestConverter
 from .test_generate_grid import TestGridGeneration
 from .test_generate_rays import TestRaysGeneration
+from .test_darc import TestDARC
