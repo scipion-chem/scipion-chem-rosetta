@@ -26,21 +26,19 @@
 # **************************************************************************
 
 """
-1. Obtener los liigandos a través del protocolo de ZINC o importar moléculas (setofSmallMolecules)
-2. Convertir a formato mol2 y pdb para imágenes (openbabel)
-3. Añadir hidrogenos (obabel -h) y eliminar aguas
-3.1 Asignar cargas (Add gasteiger charges (ADT o computeGasteigerCharges de RDKit or babel --partialcharges mmff94 or gasteiger)
-4. Generar confórmeros de baja energía (openbabel con Confab o RDKIT  AllChem.EmbedMolecule)
-5. Obtener el fichero .params a partir de los conformeros (rosetta bach_molfile_to_params)
+Protocol Steps:
+0. Input: Get the ligands through the ZINC protocol or import molecules (setofSmallMolecules)
+1. Convert to mol2 and pdb format for images (openbabel)
+2. Add hydrogens (obabel -h) and remove water
+    2.1 Assign charges (Add gasteiger charges (ADT or computeGasteigerCharges de RDKit or babel --partialcharges mmff94 or gasteiger)
+3. Generate low energy conformers (openbabel with Confab or RDKIT AllChem.EmbedMolecule)
+4. Obtain the .params file from the conformers (rosetta bach_molfile_to_params)
 """
 
-
-#IMPORT
-from pyworkflow.protocol import params
 from pwem.protocols import EMProtocol
-from pyworkflow.utils import Message
-from pwem.objects.data import AtomStruct
+from pyworkflow.protocol import params
 from pyworkflow.protocol.params import LEVEL_ADVANCED
+from pyworkflow.utils import Message
 import pyworkflow.object as pwobj
 
 import os
@@ -50,6 +48,7 @@ import shutil
 
 from bioinformatics import Plugin as Pbio
 from bioinformatics.objects import SetOfSmallMolecules, SmallMolecule
+
 from rosetta import Plugin
 from rosetta.constants import *
 
@@ -57,8 +56,11 @@ from rosetta.constants import *
 
 class Rosetta_ligand_preparation(EMProtocol):
     """
-
+    Prepare a set of molecules for use in a docking program (for example, Rosetta DARC).
+    Sets the partial atomic charges, generates low-energy conformers, and generates the
+    required parameter file for Rosetta DARC. This is done with OpenBabel.
     """
+
     _label = 'DARC Ligand preparation'
     _dic_method = {0: "gasteiger",
                   1: "mmff94",
@@ -68,14 +70,6 @@ class Rosetta_ligand_preparation(EMProtocol):
                   5: "eem",
                   6: "none"}
 
-    """
-                  6: "eem2015ba",
-                  7: "eem2015bm",
-                  8: "eem2015bn",
-                  9: "eem2015ha",
-                  10: "eem2015hm",
-                  11: "eem2015hn",
-    """
 
     # -------------------------- DEFINE param functions ----------------------
     def _defineParams(self, form):
@@ -86,7 +80,7 @@ class Rosetta_ligand_preparation(EMProtocol):
                       label='Set of small molecules:', allowsNull=False,
                       help='It must be in pdb or mol2 format, you may use the converter')
 
-        H_C = form.addGroup("Hydrogens addition and charges assignation")
+        H_C = form.addGroup("Charges assignation")
         H_C.addParam('method_charges', params.EnumParam,
                       choices=list(self._dic_method.values()),
                       default=0,
@@ -144,7 +138,7 @@ class Rosetta_ligand_preparation(EMProtocol):
 
     def _insertAllSteps(self):
         # Insert processing steps
-        self._insertFunctionStep('hydrogens_charges')
+        self._insertFunctionStep('addcharges')
         if self.conformer.get():
             self._insertFunctionStep('conformer_generation')
         self._insertFunctionStep('get_params_file')
@@ -152,14 +146,14 @@ class Rosetta_ligand_preparation(EMProtocol):
 
 
 
-    def hydrogens_charges(self):
-        """ Add hydrogens and assign the charges using a method available
+    def addcharges(self):
+        """ Assign the charges using a method available
             in the open-access and free program openbabel
         """
         for mol in self.inputSmallMols.get():
             fnSmall = mol.smallMoleculeFile.get()  # File paths
             fnMol = os.path.split(fnSmall)[1]      # Name of complete file
-            fnRoot = os.path.splitext(fnMol)[0]    # ZINC ID
+            fnRoot = os.path.splitext(fnMol)[0]    # Molecule name: ID
             fnFormat = os.path.splitext(fnMol)[1]  # Format file
 
 
@@ -168,9 +162,11 @@ class Rosetta_ligand_preparation(EMProtocol):
                 args = " -imol2 %s --partialcharge none -O %s.sdf" % (os.path.abspath(fnSmall), fnRoot)
                 Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getTmpPath()))
 
-            else:
+            elif fnFormat == ".pdb":
                 args = " -ipdb %s --partialcharge none -O %s.sdf" % (os.path.abspath(fnSmall), fnRoot)
                 Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getTmpPath()))
+            else:
+                raise Exception("Molecules must be in pdb or mol2 format")
 
 
         # Run over all sdf files generated
@@ -200,7 +196,8 @@ class Rosetta_ligand_preparation(EMProtocol):
         """ Generate a number of conformers of the same small molecule in mol2 format with
             openbabel using two different algorithm
         """
-        # 3. Generate mol2 conformers file for each molecule with OpenBabel ( I think that is more rotamers than conformers)
+
+        # 3. Generate mol2 conformers file for each molecule with OpenBabel
 
         for file in glob.glob(self._getExtraPath("*_withH.mol2")):
             fnRoot = re.split("_", os.path.split(file)[1])[0]  # ID or filename without _withH.mol2
@@ -215,8 +212,6 @@ class Rosetta_ligand_preparation(EMProtocol):
 
             Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
-
-        # 3.1 Generate conformers with RDKIT --> NEXT
 
 
     def get_params_file(self):
@@ -269,79 +264,87 @@ class Rosetta_ligand_preparation(EMProtocol):
             smallMolecule = SmallMolecule(smallMolFilename=fnSmall)
 
             if self.conformer.get(): # Conformers path if it is exist
+                try:
+                    if os.path.exists(os.path.join(self._getExtraPath(), "%s_conformers.mol2" % fnRoot)):
+                        smallMolecule._ConformersFile = pwobj.String(self._getExtraPath("%s_conformers.mol2" % fnRoot))
 
-                if os.path.exists(os.path.join(self._getExtraPath(), "%s_conformers.mol2" % fnRoot)):
-                    smallMolecule._ConformersFile = pwobj.String(self._getExtraPath("%s_conformers.mol2" % fnRoot))
+                    # Path to getPath/params/<fnRoot>_conformers
+                    path_params = os.path.join(self._getPath(), "params", "%s_conformers" %fnRoot)
 
-                # Path to getPath/params/<fnRoot>_conformers
-                path_params = os.path.join(self._getPath(), "params", "%s_conformers" %fnRoot)
+                    path, dirs, files = next(os.walk(path_params))
+                    file_count = len(files)
 
-                path, dirs, files = next(os.walk(path_params))
-                file_count = len(files)
+                    if os.path.exists(path_params) and file_count==3:
+                        for file in glob.glob(os.path.join(path_params,"*.params")):
+                            if os.path.isfile(file) and file.endswith('.params'):
+                                fout = os.path.abspath(os.path.join(path_params, "%s.params" % fnRoot))
+                                shutil.move(file, fout)
+                                smallMolecule._ParamsFile = pwobj.String(fout)
+                            else:
+                                smallMolecule._ParamsFile = pwobj.String("Not available")
 
-                if os.path.exists(path_params) and file_count==3:
-                    for file in glob.glob(os.path.join(path_params,"*.params")):
-                        if os.path.isfile(file) and file.endswith('.params'):
-                            fout = os.path.abspath(os.path.join(path_params, "%s.params" % fnRoot))
-                            shutil.move(file, fout)
-                            smallMolecule._ParamsFile = pwobj.String(fout)
-                        else:
-                            smallMolecule._ParamsFile = pwobj.String("Not available")
+                        for file in glob.glob(os.path.join(path_params,"*.pdb")):
+                            if os.path.isfile(file) and file.endswith('.pdb'):
+                                fout = os.path.abspath(os.path.join(path_params, "%s.pdb" % fnRoot))
+                                shutil.move(file, fout)
+                                smallMolecule._PDBFile = pwobj.String(fout)
+                            else:
+                                smallMolecule._PDBFile = pwobj.String("Not available")
 
-                    for file in glob.glob(os.path.join(path_params,"*.pdb")):
-                        if os.path.isfile(file) and file.endswith('.pdb'):
-                            fout = os.path.abspath(os.path.join(path_params, "%s.pdb" % fnRoot))
-                            shutil.move(file, fout)
-                            smallMolecule._PDBFile = pwobj.String(fout)
-                        else:
-                            smallMolecule._PDBFile = pwobj.String("Not available")
+                    else:
+                        smallMolecule._ParamsFile = pwobj.String("Not available")
+                        smallMolecule._PDBFile = pwobj.String("Not available")
 
-                else:
-                    smallMolecule._ParamsFile = pwobj.String("Not available")
-                    smallMolecule._PDBFile = pwobj.String("Not available")
+                    smallMolecule._PDBLigandImage = pwobj.String("Not available")
 
-                smallMolecule._PDBLigandImage = pwobj.String("Not available")
+                    outputSmallMolecules.append(smallMolecule)
+                except:
+                    pass
 
 
             else:
-                smallMolecule._ConformersFile = pwobj.String("Not generated")
+                try:
+                    smallMolecule._ConformersFile = pwobj.String("Not generated")
 
-                # Path to getPath/params/<fnRoot>_conformers
-                path_params = os.path.join(self._getPath(), "params", "%s_withH" % fnRoot)
+                    # Path to getPath/params/<fnRoot>_conformers
+                    path_params = os.path.join(self._getPath(), "params", "%s_withH" % fnRoot)
 
-                path, dirs, files = next(os.walk(path_params))
-                file_count = len(files)
+                    path, dirs, files = next(os.walk(path_params))
+                    file_count = len(files)
 
-                if os.path.exists(path_params) and file_count==3:
-                    for file in glob.glob(os.path.join(path_params, "*.params")):
-                        if os.path.isfile(file) and file.endswith('.params'):
-                            smallMolecule._ParamsFile = pwobj.String(file)
-                        else:
-                            smallMolecule._ParamsFile = pwobj.String("Not available")
+                    if os.path.exists(path_params) and file_count==3:
+                        for file in glob.glob(os.path.join(path_params, "*.params")):
+                            if os.path.isfile(file) and file.endswith('.params'):
+                                smallMolecule._ParamsFile = pwobj.String(file)
+                            else:
+                                smallMolecule._ParamsFile = pwobj.String("Not available")
 
-                    for file in glob.glob(os.path.join(path_params, "*.pdb")):
-                        if os.path.isfile(file) and file.endswith('.pdb'):
-                            smallMolecule._PDBFile = pwobj.String(file)
-                            fnOut = self._getExtraPath("%s.png" % fnRoot)
-                            args = Pbio.getPluginHome('utils/rdkitUtils.py') + " draw %s %s" % (file, fnOut)
-                            try:
-                                Pbio.runRDKit(self, "python3", args)
-                                smallMolecule._PDBLigandImage = pwobj.String(fnOut)
-                            except:
+                        for file in glob.glob(os.path.join(path_params, "*.pdb")):
+                            if os.path.isfile(file) and file.endswith('.pdb'):
+                                smallMolecule._PDBFile = pwobj.String(file)
+                                fnOut = self._getExtraPath("%s.png" % fnRoot)
+                                args = Pbio.getPluginHome('utils/rdkitUtils.py') + " draw %s %s" % (file, fnOut)
+                                try:
+                                    Pbio.runRDKit(self, "python3", args)
+                                    smallMolecule._PDBLigandImage = pwobj.String(fnOut)
+                                except:
+                                    smallMolecule._PDBLigandImage = pwobj.String("Not available")
+
+                            else:
+                                smallMolecule._PDBFile = pwobj.String("Not available")
                                 smallMolecule._PDBLigandImage = pwobj.String("Not available")
 
-                        else:
-                            smallMolecule._PDBFile = pwobj.String("Not available")
-                            smallMolecule._PDBLigandImage = pwobj.String("Not available")
+
+                    else:
+                        smallMolecule._ParamsFile = pwobj.String("Not available")
+                        smallMolecule._PDBFile = pwobj.String("Not available")
+                        smallMolecule._PDBLigandImage = pwobj.String("Not available")
 
 
-                else:
-                    smallMolecule._ParamsFile = pwobj.String("Not available")
-                    smallMolecule._PDBFile = pwobj.String("Not available")
-                    smallMolecule._PDBLigandImage = pwobj.String("Not available")
+                    outputSmallMolecules.append(smallMolecule)
+                except:
+                    pass
 
-
-            outputSmallMolecules.append(smallMolecule)
 
         # Get a list of all the file paths that ends with .pdb in protocol path to remove
         fileList = glob.glob(self._getPath("*.pdb"))
