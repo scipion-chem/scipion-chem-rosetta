@@ -106,7 +106,6 @@ class TestRaysGeneration(TestImportBase):
         print("\n Generate the rays with 1 target residue and without grid \n")
 
         prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-        agd_path  = os.path.abspath(os.path.join(self.path_data, "4erf.agd"))
 
         # Import PDB as Scipion object and prepare it
         target = self._importPDB(prot_path)
@@ -124,7 +123,7 @@ class TestRaysGeneration(TestImportBase):
         self.launchProtocol(protocol)
         ray_structure = protocol.outputStructure
         ray_txt = protocol.outputRay_TXT
-        #agd_ray = protocol.outputGRID_AGD
+
 
 
         self.assertIsNotNone(ray_structure,
@@ -142,15 +141,7 @@ class TestRaysGeneration(TestImportBase):
                         "Format ray text file is wrong. It should be txt")
         self.assertTrue(self.NonZero(ray_txt_path),
                         "Structure ray text file is empty")
-        """
-        self.assertIsNotNone(agd_ray,
-                             "There was a problem with rays generation (GRID post RAYS)- Please check it")
-        agd_ray_path = agd_ray.getFileName()
-        self.assertTrue(agd_ray_path.endswith(".agd"),
-                        "Format grid file is wrong. It should be agd")
-        self.assertTrue(self.NonZero(agd_ray_path),
-                        "Grid file file is empty")
-        """
+
 
 
     def test_2(self):
@@ -159,7 +150,6 @@ class TestRaysGeneration(TestImportBase):
         print("\n Generate the rays with 2 target residues and with electrostatic grid \n")
 
         prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-        agd_path  = os.path.abspath(os.path.join(self.path_data, "4erf.agd"))
 
         # Import PDB as Scipion object and prepare it
         target = self._importPDB(prot_path)
