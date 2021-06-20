@@ -91,13 +91,13 @@ class Rosetta_make_rayFile(EMProtocol):
                            "use to generate the shape of pocket, around of that residue,"
                            " (preferably in the protein surface) using the rays method.")
 
-        form.addParam("multiple_origin", params.BooleanParam,
+        form.addParam("multiple_target", params.BooleanParam,
                       label='Multiple target residues',
                       default=False,
                       important=True,
                       help='Use to define the bound site for the small molecules')
 
-        form.addParam('target_residues', params.StringParam, condition='multiple_origin',
+        form.addParam('target_residues', params.StringParam, condition='multiple_target',
                       label='Additional target residues',
                       help='Write the additional number of protein residues used to throw the rays and create'
                            'the docking surface. The numbers have to be separated by semicolon, comma or space.\n\n'
@@ -160,7 +160,7 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
     def generate_ray(self):
-        """
+        """Generate the txt and pdb file with the protein pocket mapping around a given residue
         """
 
         # Create the args of the program
@@ -181,7 +181,7 @@ class Rosetta_make_rayFile(EMProtocol):
 
         # Add the specific residue that will be the center of ray generation (REQUIRED)
         # To use multiple origin points for casting rays or not
-        if self.multiple_origin.get():
+        if self.multiple_target.get():
             residues_string = self.target_residues.get()
             res = list(filter(None, re.split(",|;| ", residues_string.upper())))
             target_residues = ",".join(res)
@@ -200,7 +200,7 @@ class Rosetta_make_rayFile(EMProtocol):
         if self.change_origin.get():
 
             args += " -set_origin "
-            args += "-origin_res_num %i:%s" % (self.origin_residue.get(), self.protein_chain.get())
+            args += "-origin_res_num %i" % (self.origin_residue.get())  # number of residue in a chain
 
         # To include electrostatics calculations
         if self.electrostatics.get():
@@ -231,7 +231,7 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
     def createOutput(self):
-        """
+        """ Create the greeting objects and give them the appropriate names
         """
         #Create filename
 
@@ -240,7 +240,7 @@ class Rosetta_make_rayFile(EMProtocol):
         target_res = self.target_residue.get()
 
 
-        if self.multiple_origin.get():
+        if self.multiple_target.get():
             residues_string = self.target_residues.get()
             res = list(filter(None, re.split(",|;| ", residues_string.upper())))
             target_residues = ",".join(res)
@@ -282,7 +282,6 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
 
-    # Mas información sobre el entorno del residuo y la información del propio residuo
 
     # --------------------------- UTILS functions ------------------------------
 
@@ -323,5 +322,16 @@ class Rosetta_make_rayFile(EMProtocol):
                 errors.append('The given residue number is outside the expected '
                               'range of protein residues. The range of residues is'
                               ' *[1, %i]*.' % no_res)
+
+
+        if self.multiple_target.get():
+            residues_string = self.target_residues.get()
+            res = list(filter(None, re.split(",|;| ", residues_string.upper())))
+
+            for residue in res:
+                if (int(residue) > no_res) or (int(residue) < 1):
+                    errors.append('The given residue number is outside the expected '
+                                  'range of protein residues. The range of residues is'
+                                  ' *[1, %i]*.' % no_res)
 
         return errors
