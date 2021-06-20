@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # **************************************************************************
 # *
 # * Authors:  Alberto Manuel Parra Pérez (amparraperez@gmail.com)
@@ -34,7 +35,7 @@ from .constants import *
 
 
 
-_version_ = "3.12" # Hacer como en phenix que toma cualquier versión, aunque tiene una por defecto. Recomendación COSS
+_version_ = "3.12"
 _logo = "rosetta_icon.png"
 _references = ['LeaverFay2011']
 
