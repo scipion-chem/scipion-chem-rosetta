@@ -35,7 +35,7 @@ This is necessary to subsequently generate the electrostatic potential grid.
 
 """
 
-# Imports
+
 from pyworkflow import Config
 from pyworkflow.protocol import params
 from pyworkflow.utils import Message
@@ -251,7 +251,6 @@ class RosettaProteinPreparation(EMProtocol):
 
 
         #Move and rename the files to Path from the ExtraPath
-
         shutil.move(self._getPath("%s_0001.pdb" % name_pdbfile), self._getPath("%s.pdb" % self.name_protein))
         shutil.move(self._getPath("%s.sc" % name_pdbfile), self._getExtraPath("%s.sc" % self.name_protein))
 
@@ -313,8 +312,7 @@ class RosettaProteinPreparation(EMProtocol):
         """ Summarize what the protocol has done"""
         summary = []
 
-        if self.isFinished():  # Preguntar carlos self._store() para guardar las variables
-                               # en la clase y no tener que volver a obtenerlas
+        if self.isFinished():
 
             pdb_file = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
             name_pdbfile = os.path.splitext(os.path.basename(pdb_file))[0]
