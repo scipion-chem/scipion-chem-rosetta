@@ -123,12 +123,13 @@ class Autodock_GridGeneration(EMProtocol):
         structure, x_center, y_center, z_center = self.calculate_centerMass(filename)
 
         # Create the GPF file, required by autogrid to build the grid and glg
-        npts = (self.radius.get()+10)/self.spacing.get()  # x,y,z points of the grid
+        npts = (self.radius.get()*2)/self.spacing.get()  # x,y,z points of the grid
 
         gpf_file = self.generate_gpf(filename=pdbqt, spacing=self.spacing.get(),
                                      xc=x_center, yc=y_center, zc=z_center,
                                      npts=npts)
 
+        # Create GLG file
         glg_file = os.path.abspath(self._getExtraPath("library.glg"))
         open(glg_file, mode='a').close()
 
@@ -165,6 +166,7 @@ class Autodock_GridGeneration(EMProtocol):
             self._defineSourceRelation(self.inputpdb, grid)
 
 
+
     # --------------------------- Utils functions --------------------
 
     def calculate_centerMass(self, filename):
@@ -187,44 +189,9 @@ class Autodock_GridGeneration(EMProtocol):
 
 
 
-    def calculate_OuterDistance(self, expand=10):
-        """
-        Returns the higher distance between the mass center and the different atoms of the protein
-        """
-
-        # Structure and this Center of mass.
-        structure, x_center, y_center, z_center = self.calculate_centerMass()
-
-        # First point to calculate euclidean distance
-        dist = 0
-
-        # iterate for all aminoacids
-        for model in structure:
-            for chain in model:
-                for residue in chain:
-                    for atom in residue:
-                        coord = atom.get_coord()
-                        x = coord[0]
-                        y = coord[1]
-                        z = coord[2]
-
-                        dist_new = (math.sqrt((x-0)**2 + (y-0)**2 + (z-0)**2)) /self.spacing.get()
-                        #dist_new = (math.sqrt((x - x_center) ** 2 + (y - y_center) ** 2 + (z - z_center) ** 2)) * (1 / self.spacing.get())
-
-                        if dist_new > dist:
-                            dist=dist_new
-
-        return (dist + expand)
-        #dist_new = (math.sqrt((xmin - x_center) ** 2 + (ymin - y_center) ** 2 + (zmin - z_center) ** 2)) * (1 / self.spacing.get())
-
-
-
-
-
     def generate_gpf(self, filename, spacing, xc, yc, zc, npts):
         """
-
-        :return:
+        Build the GPF file that is needed for AUTOGRID to generate the electrostatic grid
         """
 
         filename = filename
