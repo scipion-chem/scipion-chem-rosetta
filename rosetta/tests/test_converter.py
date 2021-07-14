@@ -33,7 +33,7 @@ from pathlib import Path
 from pyworkflow.tests import *
 from pwem.protocols.protocol_import import ProtImportPdb
 
-from bioinformatics.protocols.protocol_import_smallMolecules import ProtBioinformaticsImportSmallMolecules as importSM
+from pwchem.protocols.protocol_import_smallMolecules import ProtChemImportSmallMolecules as importSM
 
 from rosetta.protocols.protocol_converter import ConvertStructures as converter
 

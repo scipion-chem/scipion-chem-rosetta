@@ -40,7 +40,7 @@ from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile as mak
 from rosetta.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
 from rosetta.protocols.protocol_darc import Rosetta_darc as darc
 
-from bioinformatics.protocols.protocol_import_smallMolecules import ProtBioinformaticsImportSmallMolecules as importSM
+from pwchem.protocols.protocol_import_smallMolecules import ProtChemImportSmallMolecules as importSM
 
 
 

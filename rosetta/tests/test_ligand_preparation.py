@@ -31,7 +31,7 @@ from collections import Counter
 
 from pyworkflow.tests import *
 from pathlib import Path
-from bioinformatics.protocols.protocol_import_smallMolecules import ProtBioinformaticsImportSmallMolecules as importSM
+from pwchem.protocols.protocol_import_smallMolecules import ProtChemImportSmallMolecules as importSM
 
 
 from rosetta.protocols.protocol_ligand_preparation import Rosetta_ligand_preparation as Prepare

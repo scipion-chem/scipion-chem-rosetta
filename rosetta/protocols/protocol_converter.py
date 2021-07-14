@@ -32,7 +32,7 @@ from pyworkflow.protocol.params import PointerParam, EnumParam
 from pwem.objects.data import AtomStruct
 from pwem.protocols import EMProtocol
 
-from bioinformatics.objects import SetOfSmallMolecules, SmallMolecule
+from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 
 from rosetta import Plugin
 

@@ -46,8 +46,8 @@ import re
 import glob
 import shutil
 
-from bioinformatics import Plugin as Pbio
-from bioinformatics.objects import SetOfSmallMolecules, SmallMolecule
+from pwchem import Plugin as Pbio
+from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 
 from rosetta import Plugin
 from rosetta.constants import *

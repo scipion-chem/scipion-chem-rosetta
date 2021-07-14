@@ -45,7 +45,7 @@ from pwem.protocols import EMProtocol
 from pwem.convert import AtomicStructHandler
 
 
-from bioinformatics import Plugin as bioinformatics_plugin
+from pwchem import Plugin as pwchem_plugin
 
 from rosetta.objects import GridAGD
 
@@ -103,8 +103,8 @@ class Autodock_GridGeneration(EMProtocol):
         args = ' -v -r %s -o %s' % (fnIn, fnOut)
 
         program = "prepare_receptor4"
-        self.runJob(bioinformatics_plugin.getMGLPath('bin/pythonsh'),
-                    bioinformatics_plugin.getADTPath('Utilities24/%s.py' % program) + args)
+        self.runJob(pwchem_plugin.getMGLPath('bin/pythonsh'),
+                    pwchem_plugin.getADTPath('Utilities24/%s.py' % program) + args)
 
 
 
@@ -134,7 +134,7 @@ class Autodock_GridGeneration(EMProtocol):
         open(glg_file, mode='a').close()
 
         args = "-p %s -l %s" % (gpf_file, glg_file)
-        self.runJob(bioinformatics_plugin.getAutodockPath("autogrid4"), args, cwd=self._getExtraPath())
+        self.runJob(pwchem_plugin.getAutodockPath("autogrid4"), args, cwd=self._getExtraPath())
 
         # Build AGD format
         e_map = self._getExtraPath("%s.e.map" %name_protein)
