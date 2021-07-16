@@ -24,29 +24,31 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+import os
+from .objects import GridAGD
 
-"""
-This wizard will extract the chains from a atomic structure (pdb) file in
-order to select it in the protocol.
-Then, it will load the structure and will take all chain related
-information such as name and number of residues.
-"""
+def adt2agdGrid(adtGrid, agdfile=None, outDir=None):
+  e_map = adtGrid.getFileName()
+  if agdfile == None:
+    if outDir != None:
+      agdName = e_map.split('/')[-1].replace('.e.map', '.agd')
+      agdfile = os.path.join(outDir, agdName)
+    else:
+      agdfile = e_map.replace('.e.map', '.agd')
 
-# Imports
-from pwem.wizards.wizard import EmWizard
-from pwem.wizards.wizards_3d.mask_structure_wizard import MaskStructureWizard
-from rosetta.protocols.protocol_generate_grid import Autodock_GridGeneration
+  x_center, y_center, z_center = adtGrid.massCenter.get()
+  npts = (adtGrid.radius.get() * 2) / adtGrid.spacing.get()
 
+  with open(agdfile, "w") as agd:
+    agd.write("Title: \n")
+    agd.write("Mid:   %s     %s    %s\n" % (round(x_center, 3), round(y_center, 3), round(z_center, 3)))
+    agd.write("Dim:     %s     %s     %s\n" % (round(npts, None), round(npts, None), round(npts, None)))
+    agd.write("Spacing:     %s\n" % (adtGrid.spacing.get()))
+    agd.write("Values:\n")
 
-class GetDistance2Center(EmWizard):
-    _targets = [(Autodock_GridGeneration, ['radius'])]
+    with open(e_map, "r") as emap:
+      for line in emap.readlines():
+        if not line.startswith(("GRID", "MACROMOLECULE", "SPACING", "CENTER", "NELEMENTS")):
+          agd.write(line)
 
-    def show(self, form):
-        protocol = form.protocol
-        structure = protocol.inputpdb.get()
-        if not structure:
-            print('You must specify input structure')
-            return
-        plt = MaskStructureWizard(structure.getFileName())
-        plt.initializePlot()
-        form.setVar('radius', plt.radius)
+  return GridAGD(agdfile)

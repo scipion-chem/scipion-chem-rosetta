@@ -39,7 +39,6 @@ from pyworkflow.protocol import params
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 from pwem.protocols import EMProtocol
 from pyworkflow.utils import Message
-from pwem.objects.data import AtomStruct
 from pyworkflow.utils import createLink
 
 import shutil
@@ -49,6 +48,7 @@ import re
 from rosetta import Plugin
 from rosetta.constants import *
 from rosetta.objects import RaysProtein, RaysStruct, GridAGD
+from ..convert import adt2agdGrid
 
 
 
@@ -128,12 +128,12 @@ class Rosetta_make_rayFile(EMProtocol):
                       important=True,
                       help='')
 
-        form.addParam("grid", params.PointerParam, pointerClass="GridAGD",
+        form.addParam("grid", params.PointerParam, pointerClass="GridADT",
                       condition="electrostatics",
                       label="Grid file",
                       important=True,
                       allowsNull=False,
-                      help="Select the ligand params file")
+                      help="Select the grid file")
 
 
         advanced = form.addGroup("Runs option",  expertLevel=LEVEL_ADVANCED)
@@ -155,9 +155,14 @@ class Rosetta_make_rayFile(EMProtocol):
 
     def _insertAllSteps(self):
         # Insert processing steps
+        self._insertFunctionStep('convertInputStep')
         self._insertFunctionStep('generate_ray')
         self._insertFunctionStep('createOutput')
 
+    def convertInputStep(self):
+        if self.electrostatics.get():
+            adtGridName = self.grid.get().getFileName().split('/')[-1]
+            self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
 
     def generate_ray(self):
         """Generate the txt and pdb file with the protein pocket mapping around a given residue
@@ -205,7 +210,7 @@ class Rosetta_make_rayFile(EMProtocol):
         # To include electrostatics calculations
         if self.electrostatics.get():
             # args += " -add_electrostatics"
-            grid_file = self.grid.get().getFileName()
+            grid_file = self.agdGrid.getFileName()
             args += " -espGrid_file %s" % os.path.abspath(grid_file)
 
             # -add_electroestatics
@@ -225,9 +230,6 @@ class Rosetta_make_rayFile(EMProtocol):
         else:
             args += " -gpu %s" % str(self.gpuList.get())
             Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES_GPU), args, cwd=self._getExtraPath())
-
-
-
 
 
     def createOutput(self):
@@ -268,7 +270,7 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
         if self.electrostatics.get():
-            grid_file = self.grid.get().getFileName()
+            grid_file = self.agdGrid.getFileName()
             name = os.path.splitext(os.path.basename(grid_file))[0]
             agd_darcFile = self._getExtraPath("DARC_%s.agd" % name)
             if os.path.exists(os.path.abspath(agd_darcFile)):

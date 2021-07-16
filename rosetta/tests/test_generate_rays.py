@@ -35,7 +35,7 @@ from pwem.protocols.protocol_import import ProtImportPdb
 
 from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation as Prepare
 from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile as makeRay
-from rosetta.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
+from autodock.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
 
 
 

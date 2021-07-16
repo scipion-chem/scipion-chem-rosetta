@@ -8,7 +8,6 @@
 
 from .protocol_target_preparation import RosettaProteinPreparation
 from .protocol_ligand_preparation import Rosetta_ligand_preparation
-from .protocol_generate_grid import Autodock_GridGeneration
 from .protocol_generate_rays import Rosetta_make_rayFile
 from .protocol_darc import Rosetta_darc
 

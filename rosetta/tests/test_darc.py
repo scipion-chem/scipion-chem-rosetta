@@ -37,11 +37,10 @@ from pwem.protocols.protocol_import import ProtImportPdb
 from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation as PrepareProtein
 from rosetta.protocols.protocol_ligand_preparation import Rosetta_ligand_preparation as PrepareLigand
 from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile as makeRay
-from rosetta.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
 from rosetta.protocols.protocol_darc import Rosetta_darc as darc
 
 from pwchem.protocols.protocol_import_smallMolecules import ProtChemImportSmallMolecules as importSM
-
+from autodock.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
 
 
 

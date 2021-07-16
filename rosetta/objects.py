@@ -28,7 +28,8 @@
 
 import pyworkflow.object as pwobj
 import pwem.objects.data as data
-from pwem.objects.data import AtomStruct
+from autodock.objects import GridADT
+import math
 
 class RaysProtein(data.EMFile):
     """ Represent a RAY file """
@@ -42,10 +43,23 @@ class RaysStruct(data.AtomStruct):
         data.AtomStruct.__init__(self, filename, pseudoatoms, **kwargs)
 
 
-class GridAGD(data.EMFile):
+class GridAGD(GridADT):
     """ Represent a grid file in agd (ASCIII) format """
-    def __init__(self, filename=None, **kwargs):
-        data.EMFile.__init__(self, filename, **kwargs)
+    def __init__(self, filename, **kwargs):
+        GridADT.__init__(self, filename, **kwargs)
+        self.parseFile()
+
+    def parseFile(self):
+        with open(self.getFileName()) as f:
+            for line in f:
+                if line.startswith('Mid:'):
+                    self.setMassCenter(list(map(float, line.split()[1:])))
+                elif line.startswith('Dim:'):
+                    npts=float(line.split()[1])
+                    self.setNumberOfPoints(npts)
+                elif line.startswith('Spacing:'):
+                    self.setSpacing(float(line.split()[1]))
+        self.setRadius(math.sqrt(npts * self.spacing))
 
 
 class DarcScore(data.EMObject):

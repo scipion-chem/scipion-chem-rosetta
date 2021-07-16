@@ -50,6 +50,7 @@ import glob
 from rosetta import Plugin
 from rosetta.constants import *
 from rosetta.objects import (DarcScore, SetScores)
+from ..convert import adt2agdGrid
 
 
 
@@ -102,7 +103,7 @@ class Rosetta_darc(EMProtocol):
                       important=True,
                       help="")
 
-        form.addParam("grid", params.PointerParam, pointerClass="GridAGD",
+        form.addParam("grid", params.PointerParam, pointerClass="GridADT",
                       condition="shape_only==False",
                       label="Grid file",
                       important=True,
@@ -172,11 +173,17 @@ class Rosetta_darc(EMProtocol):
 
     def _insertAllSteps(self):
         # Insert processing steps
-        self._insertFunctionStep('darc')
-        self._insertFunctionStep('organize_files')
-        self._insertFunctionStep('createOutput')
+        self._insertFunctionStep('convertInputStep')
+        self._insertFunctionStep('darcStep')
+        self._insertFunctionStep('organizeFilesStep')
+        self._insertFunctionStep('createOutputStep')
 
-    def darc(self):
+    def convertInputStep(self):
+        if not self.shape_only.get():
+          adtGridName = self.grid.get().getFileName().split('/')[-1]
+          self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
+
+    def darcStep(self):
         """ Launch a docking process with Rosetta DARC for each ligand
         """
 
@@ -216,8 +223,8 @@ class Rosetta_darc(EMProtocol):
                 args += " -darc_shape_only"
             else:
                 #args += " -add_electrostatics"
-                grid_file = self.grid.get().getFileName()
-                args += " -espGrid_file %s" % os.path.abspath(grid_file)
+
+                args += " -espGrid_file %s" % os.path.abspath(self.agdGrid.getFileName())
 
 
             # Search conformers on the fly. DARC 2.0. Optimize conformer during docking
@@ -266,7 +273,7 @@ class Rosetta_darc(EMProtocol):
 
 
 
-    def organize_files(self):
+    def organizeFilesStep(self):
         """
         DARC build multiple files and their organization is better
         """
@@ -329,7 +336,7 @@ class Rosetta_darc(EMProtocol):
 
 
 
-    def createOutput(self):
+    def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
 
         scores = self._getPath("darc_score.sc")
