@@ -45,9 +45,10 @@ class RaysStruct(data.AtomStruct):
 
 class GridAGD(GridADT):
     """ Represent a grid file in agd (ASCIII) format """
-    def __init__(self, filename, **kwargs):
-        GridADT.__init__(self, filename, **kwargs)
-        self.parseFile()
+    def __init__(self, filename=None, **kwargs):
+        super().__init__(filename, **kwargs)
+        if filename != None:
+            self.parseFile()
 
     def parseFile(self):
         with open(self.getFileName()) as f:
@@ -59,7 +60,7 @@ class GridAGD(GridADT):
                     self.setNumberOfPoints(npts)
                 elif line.startswith('Spacing:'):
                     self.setSpacing(float(line.split()[1]))
-        self.setRadius(math.sqrt(npts * self.spacing))
+        self.setRadius(math.sqrt(npts * self.getSpacing()))
 
 
 class DarcScore(data.EMObject):

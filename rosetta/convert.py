@@ -36,14 +36,14 @@ def adt2agdGrid(adtGrid, agdfile=None, outDir=None):
     else:
       agdfile = e_map.replace('.e.map', '.agd')
 
-  x_center, y_center, z_center = adtGrid.massCenter.get()
-  npts = (adtGrid.radius.get() * 2) / adtGrid.spacing.get()
+  x_center, y_center, z_center = adtGrid.getMassCenter()
+  npts = (adtGrid.getRadius() * 2) / adtGrid.getSpacing()
 
   with open(agdfile, "w") as agd:
     agd.write("Title: \n")
     agd.write("Mid:   %s     %s    %s\n" % (round(x_center, 3), round(y_center, 3), round(z_center, 3)))
     agd.write("Dim:     %s     %s     %s\n" % (round(npts, None), round(npts, None), round(npts, None)))
-    agd.write("Spacing:     %s\n" % (adtGrid.spacing.get()))
+    agd.write("Spacing:     %s\n" % (adtGrid.getSpacing()))
     agd.write("Values:\n")
 
     with open(e_map, "r") as emap:
