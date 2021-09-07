@@ -133,7 +133,7 @@ class ConvertStructures(EMProtocol):
     def convertStep(self):
 
         if self.inputType==0:  # Small molecules
-            outputSmallMolecules = SetOfSmallMolecules().create(path=self._getPath(), suffix='SmallMols')
+            outputSmallMolecules = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix='SmallMols')
 
             error = []  # Save the file paths that could not be transformed
             for mol in self.inputSmallMols.get():

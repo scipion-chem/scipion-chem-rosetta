@@ -255,7 +255,7 @@ class Rosetta_ligand_preparation(EMProtocol):
               - Image of the conformers pdb if it is possible
         """
 
-        outputSmallMolecules = SetOfSmallMolecules().create(path=self._getPath(), suffix='_for_DARC')
+        outputSmallMolecules = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix='_for_DARC')
 
 
         for fnSmall in glob.glob(self._getExtraPath("*_withH.mol2")):

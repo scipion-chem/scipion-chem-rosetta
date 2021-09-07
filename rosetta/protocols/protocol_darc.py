@@ -340,7 +340,7 @@ class Rosetta_darc(EMProtocol):
         """Create a set of darc score for each small molecule and ID"""
 
         scores = self._getPath("darc_score.sc")
-        outputDarcScore = SetScores().create(path=self._getPath(), suffix='')
+        outputDarcScore = SetScores().create(outputPath=self._getPath(), suffix='')
 
         with open(scores) as sc:
             lines = sc.readlines()
