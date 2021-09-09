@@ -40,6 +40,7 @@ def adt2agdGrid(adtGrid, agdfile=None, outDir=None):
   npts = (adtGrid.getRadius() * 2) / adtGrid.getSpacing()
 
   with open(agdfile, "w") as agd:
+    #https://docs.eyesopen.com/toolkits/python/oechemtk/grids.html
     agd.write("Title:\n")
     agd.write("Mid: %12.6f %12.6f %12.6f\n" % (x_center, y_center, z_center))
     agd.write("Dim: %6d %6d %6d\n" % (npts, npts, npts))
