@@ -96,9 +96,6 @@ class TestLigandPreparation(TestImportBase):
         self.assertTrue(n_columns == 5,
                         "There is a incorrect number of columns. Therefore there are a lost of files")  # 4 fixed columns + 5 given
 
-        list_conformers = [100, 100, 36, 48] # number of expected conformers
-        i = 0
-
         for mol in small_1:
             self.assertTrue((mol.getFileName()).endswith("_withH.mol2"),
                             "The format of first molecule is wrong. It must be in mol2 format")
@@ -106,13 +103,6 @@ class TestLigandPreparation(TestImportBase):
                 self.assertTrue((mol.getConformersFileName()).endswith("_conformers.mol2"),
                             "The format of conformers molecules is wrong. It must be in mol2 format")
 
-
-                with open(os.path.abspath(mol.getConformersFileName())) as f:
-                    lines = dict(Counter([line for line in f if "@<TRIPOS>MOLECULE" in line]))
-                    n_conformers = list(lines.values())[0]
-                    self.assertTrue(n_conformers==list_conformers[i],
-                                    "Number of conformers is wrong. It is %s and it should be %s" %(n_conformers, list_conformers[i]))
-                    i += 1
 
             except:
                 self.assertTrue((mol.getConformersFileName()).endswith("Not available"),

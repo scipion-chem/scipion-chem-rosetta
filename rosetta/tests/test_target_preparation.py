@@ -110,7 +110,7 @@ class TestTargetPreparation(TestImportBase):
         # Import PDB as Scipion object
         target = self._importPDB(prot_path)
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': False,
                 'waters': True,
                 'HETATM': False,
@@ -159,7 +159,7 @@ class TestTargetPreparation(TestImportBase):
         # Import PDB as Scipion object
         target = self._importPDB(prot_path)
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': False,
                 'waters': False,
                 'HETATM': True,
@@ -213,7 +213,7 @@ class TestTargetPreparation(TestImportBase):
         # Import PDB as Scipion object
         target = self._importPDB(prot_path)
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': True,
                 'waters': False,
                 'HETATM': False,
@@ -269,7 +269,7 @@ class TestTargetPreparation(TestImportBase):
         # Import PDB as Scipion object
         target = self._importPDB(prot_path)
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': True,
                 'waters': True,
                 'HETATM': True,
