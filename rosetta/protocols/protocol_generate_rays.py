@@ -77,7 +77,7 @@ class Rosetta_make_rayFile(EMProtocol):
                             "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
                             "to use GPU")
 
-        form.addParam("inputpdb", params.PointerParam, pointerClass="AtomStruct",
+        form.addParam("inputAtomStruct", params.PointerParam, pointerClass="AtomStruct",
                       label="Atomic structure",
                       important=True,
                       allowsNull=False,
@@ -172,7 +172,7 @@ class Rosetta_make_rayFile(EMProtocol):
         args = ""
 
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.inputpdb.get().getFileName()
+        pdb_file = self.inputAtomStruct.get().getFileName()
         pdb_file_extra = os.path.join(self._getExtraPath(), os.path.basename(pdb_file))
         createLink(pdb_file, pdb_file_extra)
 
@@ -237,7 +237,7 @@ class Rosetta_make_rayFile(EMProtocol):
         """
         #Create filename
 
-        pdb_ini = self.inputpdb.get().getFileName()
+        pdb_ini = self.inputAtomStruct.get().getFileName()
         filename = os.path.splitext(os.path.basename(pdb_ini))[0]
         target_res = self.target_residue.get()
 
@@ -280,7 +280,7 @@ class Rosetta_make_rayFile(EMProtocol):
             outputdict={'outputStructure': target, 'outputRay_TXT': rayfile}
 
         self._defineOutputs(**outputdict)
-        self._defineSourceRelation(self.inputpdb, target)
+        self._defineSourceRelation(self.inputAtomStruct, target)
 
 
 
@@ -310,7 +310,7 @@ class Rosetta_make_rayFile(EMProtocol):
         """
         errors = []
 
-        no_res = self.length_residues_pdb(self.inputpdb.get().getFileName())
+        no_res = self.length_residues_pdb(self.inputAtomStruct.get().getFileName())
         no_res_center = self.target_residue.get()
         no_res_origin = self.origin_residue.get()
 

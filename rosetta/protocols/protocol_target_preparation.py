@@ -72,7 +72,7 @@ class RosettaProteinPreparation(EMProtocol):
         """
         form.addSection(label=Message.LABEL_INPUT)
 
-        form.addParam("inputpdb", params.PointerParam, pointerClass="AtomStruct",
+        form.addParam("inputAtomStruct", params.PointerParam, pointerClass="AtomStruct",
                       label="Atomic structure",
                       important=True, allowsNull=False,
                       help="Select the atomic structure of the docking target protein")
@@ -136,7 +136,7 @@ class RosettaProteinPreparation(EMProtocol):
         """ Clean the pdb file from waters and ligands
         """
 
-        protein = self.inputpdb
+        protein = self.inputAtomStruct
 
         # Get a PDB format file to the protein structure
         pdb_ini = protein.get().getFileName()
@@ -274,7 +274,7 @@ class RosettaProteinPreparation(EMProtocol):
         if os.path.exists(os.path.expanduser(pdb_file_out)):
             target = AtomStruct(filename=pdb_file_out)
             self._defineOutputs(outputStructure=target)
-            self._defineSourceRelation(self.inputpdb, target)
+            self._defineSourceRelation(self.inputAtomStruct, target)
 
 
 
@@ -285,7 +285,7 @@ class RosettaProteinPreparation(EMProtocol):
         """
         errors = []
 
-        if self.inputpdb.get() is None:
+        if self.inputAtomStruct.get() is None:
             errors.append("A pdb file was not entered in the Atomic structure field. Please enter it.")
 
         # Check that the program exists

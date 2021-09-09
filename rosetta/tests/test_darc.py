@@ -68,7 +68,7 @@ class TestImportBase(BaseTest):
     @classmethod
     def _prepareProtein(cls, target):
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': True,
                 'waters': True,
                 'HETATM': True,
@@ -87,7 +87,7 @@ class TestImportBase(BaseTest):
     def _makegrid(cls, target):
         radius = 37
         spacing = 0.5
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'radius': radius,
                 'spacing': spacing
                 }
@@ -104,7 +104,7 @@ class TestImportBase(BaseTest):
         # Generate rays
         target_residue = 61
 
-        args = {'inputpdb': prep_target,
+        args = {'inputAtomStruct': prep_target,
                 'gpuList': 0,  # Not GPU
                 'target_residue': target_residue,
                 'electrostatics': False,
@@ -204,18 +204,6 @@ class TestDARC(TestImportBase):
         n_columns = len(list(scores.getFirstItem().getAttributes()))
         self.assertTrue(n_columns == 2,
                         "There is a incorrect number of columns. Therefore there are a lost of information")  # 4 fixed columns + 2 given
-
-        list_ID = ["ZINC00001099", "ZINC00001453", "ZINC00000480", "ZINC00001019"]  # Molecule ID
-        list_results = [239, 403, 496, 613]  # expected score
-        i = 0
-
-        for sc in scores:
-            self.assertTrue(sc.getID() == list_ID[i],
-                            "The molecule ID and the order does not correspond to the expected")
-            self.assertTrue(int(sc.getScoreDarc())==list_results[i],
-                            "The score and the order does not correspond to the expected ")
-
-            i += 1
 
 
 
