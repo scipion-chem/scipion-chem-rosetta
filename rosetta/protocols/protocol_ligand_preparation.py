@@ -288,6 +288,12 @@ class Rosetta_ligand_preparation(EMProtocol):
                                 fout = os.path.abspath(os.path.join(path_params, "%s.pdb" % fnRoot))
                                 shutil.move(file, fout)
                                 smallMolecule._PDBFile = pwobj.String(fout)
+
+                                paramsFile = fout.replace('.pdb', '.params')
+                                ligandCode = self.getLigandCode(paramsFile)
+                                foutCode = os.path.abspath(os.path.join(path_params, "%s_conformers.pdb" % ligandCode))
+                                shutil.copy(fout, foutCode)
+
                             else:
                                 smallMolecule._PDBFile = pwobj.String("Not available")
 
@@ -360,7 +366,6 @@ class Rosetta_ligand_preparation(EMProtocol):
             self._defineSourceRelation(self.inputSmallMols, outputSmallMolecules)
 
 
-
     # --------------------------- UTILS functions ------------------------------
     def _validate(self):
         """ Validate if the inputs are in mol2 or pdb format
@@ -379,3 +384,8 @@ class Rosetta_ligand_preparation(EMProtocol):
 
 
         return errors
+
+    def getLigandCode(self, paramsFile):
+      with open(paramsFile) as f:
+        code = f.readline().split()[1]
+      return code
