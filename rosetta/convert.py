@@ -40,15 +40,15 @@ def adt2agdGrid(adtGrid, agdfile=None, outDir=None):
   npts = (adtGrid.getRadius() * 2) / adtGrid.getSpacing()
 
   with open(agdfile, "w") as agd:
-    agd.write("Title: \n")
-    agd.write("Mid:   %s     %s    %s\n" % (round(x_center, 3), round(y_center, 3), round(z_center, 3)))
-    agd.write("Dim:     %s     %s     %s\n" % (round(npts, None), round(npts, None), round(npts, None)))
-    agd.write("Spacing:     %s\n" % (adtGrid.getSpacing()))
+    agd.write("Title:\n")
+    agd.write("Mid: %12.6f %12.6f %12.6f\n" % (x_center, y_center, z_center))
+    agd.write("Dim: %6d %6d %6d\n" % (npts, npts, npts))
+    agd.write("Spacing: %12.6f\n" % adtGrid.getSpacing())
     agd.write("Values:\n")
 
     with open(e_map, "r") as emap:
       for line in emap.readlines():
         if not line.startswith(("GRID", "MACROMOLECULE", "SPACING", "CENTER", "NELEMENTS")):
-          agd.write(line)
+          agd.write("%-12.6e\n" % float(line.strip()))
 
   return GridAGD(agdfile)
