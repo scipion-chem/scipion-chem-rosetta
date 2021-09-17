@@ -47,7 +47,7 @@ import re
 
 from rosetta import Plugin
 from rosetta.constants import *
-from rosetta.objects import RaysProtein, RaysStruct, GridAGD
+from rosetta.objects import RosettaRaysProtein, RosettaRaysStruct, GridAGD
 from ..convert import adt2agdGrid
 
 
@@ -263,8 +263,8 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
         if os.path.exists(os.path.abspath(pdb_file_out)) and os.path.exists(os.path.abspath(txt_file_out)):
-            target = RaysStruct(filename=pdb_file_out)
-            rayfile = RaysProtein(filename=txt_file_out)
+            target = RosettaRaysStruct(filename=pdb_file_out)
+            rayfile = RosettaRaysProtein(filename=txt_file_out)
         else:
             raise Exception("Something wrong in output creation")
 

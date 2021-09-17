@@ -31,13 +31,13 @@ import pwem.objects.data as data
 from autodock.objects import GridADT
 import math
 
-class RaysProtein(data.EMFile):
+class RosettaRaysProtein(data.EMFile):
     """ Represent a RAY file """
     def __init__(self, filename=None, **kwargs):
         data.EMFile.__init__(self, filename, **kwargs)
 
 
-class RaysStruct(data.AtomStruct):
+class RosettaRaysStruct(data.AtomStruct):
     """ Represent a RAY pdb file """
     def __init__(self, filename=None, pseudoatoms=False, **kwargs):
         data.AtomStruct.__init__(self, filename, pseudoatoms, **kwargs)

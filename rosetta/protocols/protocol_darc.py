@@ -91,7 +91,7 @@ class Rosetta_darc(EMProtocol):
                       allowsNull=False,
                       help="Select the ligand or ligand conformers for molecular docking")
 
-        form.addParam("ray_file", params.PointerParam, pointerClass="RaysProtein", #txt
+        form.addParam("ray_file", params.PointerParam, pointerClass="RosettaRaysProtein", #txt
                       label="Ray file",
                       important=True,
                       allowsNull=False,
