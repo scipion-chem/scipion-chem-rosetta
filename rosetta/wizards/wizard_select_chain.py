@@ -70,8 +70,8 @@ class GetChainsWizard(Wizard):
 
         structureHandler = AtomicStructHandler()
 
-        if protocol.inputpdb.get() is not None:
-            filename = os.path.abspath(protocol.inputpdb.get().getFileName())
+        if protocol.inputAtomStruct.get() is not None:
+            filename = os.path.abspath(protocol.inputAtomStruct.get().getFileName())
 
 
         structureHandler.read(filename)
