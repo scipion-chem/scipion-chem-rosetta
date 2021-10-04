@@ -134,7 +134,7 @@ class DARCViewer(ProtocolViewer):
                       help="")
 
         if self.protocol.minimize_output.get():
-            view_mini = form.addGroup("Visualizationof complexes after minimization")
+            view_mini = form.addGroup("Visualization of complexes after minimization")
             view_mini.addParam('show_complex_mini', LabelParam,
                           label="Visualize complex protein-ligand")
 

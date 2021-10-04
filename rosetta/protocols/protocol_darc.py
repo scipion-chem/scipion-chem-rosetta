@@ -40,6 +40,7 @@ from pyworkflow.protocol import params
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 import pyworkflow.object as pwobj
 from pwem.protocols import EMProtocol
+from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 
 from operator import itemgetter
 import shutil
@@ -86,7 +87,7 @@ class Rosetta_darc(EMProtocol):
                       help="Select the atomic structure of the prepared protein file")
 
         form.addParam("ligands", params.PointerParam, pointerClass="SetOfSmallMolecules", #PDB of the ligands
-                      label="Ligand to dock",
+                      label="Ligands to dock",
                       important=True,
                       allowsNull=False,
                       help="Select the ligand or ligand conformers for molecular docking")
@@ -339,9 +340,29 @@ class Rosetta_darc(EMProtocol):
     def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
 
+        outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
+        outDir = self._getExtraPath('ligands/')
+        if self.minimize_output.get():
+            outDir = self._getExtraPath('minimization/ligands/')
+          
+        
+        pdbFiles = list(os.listdir(outDir))
+        for mol in self.ligands.get():
+            molName = mol.getMolName()
+            for pFile in pdbFiles:
+                if molName.split('_')[0] in pFile:
+                    newPDBFile = self._getPath(molName+'.pdb')
+                    shutil.copy(outDir + pFile, newPDBFile)
+                    newMol = SmallMolecule()
+                    newMol.copy(mol)
+                    newMol.cleanObjId()
+                    newMol.poseFile.set(newPDBFile)
+                    outputSet.append(newMol)
+        self._defineOutputs(outputSmallMolecules=outputSet)
+
+
         scores = self._getPath("darc_score.sc")
         outputDarcScore = SetScores().create(outputPath=self._getPath(), suffix='')
-
         with open(scores) as sc:
             lines = sc.readlines()
             for line in lines[1:]:
