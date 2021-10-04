@@ -33,10 +33,7 @@ from pwem.objects.data import AtomStruct
 from pwem.protocols import EMProtocol
 
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
-
-from rosetta import Plugin
-
-
+from pwchem.utils import runOpenBabel
 
 
 def inputArg(fn):  # Input format file (fn)
@@ -148,7 +145,7 @@ class ConvertStructures(EMProtocol):
                     fnOut, argout = outputArg(fnRoot, self.outputFormatSmall.get(), self)
                     args += argout
 
-                    Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+                    runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
                     smallMolecule = SmallMolecule(smallMolFilename=fnOut)
                     outputSmallMolecules.append(smallMolecule)
@@ -172,7 +169,7 @@ class ConvertStructures(EMProtocol):
 
             args += argout
 
-            Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getPath()))
+            runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getPath()))
 
             target = AtomStruct(filename=fnOut)
             self._defineOutputs(outputStructure=target)
