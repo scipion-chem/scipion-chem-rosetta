@@ -48,6 +48,7 @@ import shutil
 
 from pwchem import Plugin as Pbio
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
+from pwchem.utils import runOpenBabel
 
 from rosetta import Plugin
 from rosetta.constants import *
@@ -160,11 +161,11 @@ class Rosetta_ligand_preparation(EMProtocol):
             # 0. Convert mol2 or pdb format to sdf to ensure the correct assignation of charges
             if fnFormat == ".mol2":
                 args = " -imol2 %s --partialcharge none -O %s.sdf" % (os.path.abspath(fnSmall), fnRoot)
-                Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getTmpPath()))
+                runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getTmpPath()))
 
             elif fnFormat == ".pdb":
                 args = " -ipdb %s --partialcharge none -O %s.sdf" % (os.path.abspath(fnSmall), fnRoot)
-                Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getTmpPath()))
+                runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getTmpPath()))
             else:
                 raise Exception("Molecules must be in pdb or mol2 format")
 
@@ -180,15 +181,15 @@ class Rosetta_ligand_preparation(EMProtocol):
 
             # With a given pH
             if self.ph.get():
-                args = " -isdf %s -p %s --partialcharge %s -O %s_withH.mol2" % (os.path.abspath(filesdf),
+                args = " -isdf %s -p %s --partialcharge %s -O %s_prep.mol2" % (os.path.abspath(filesdf),
                                                                                 str(self.phvalue.get()), cmethod,
                                                                                 fnRoot)
 
-                Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+                runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
             else:
-                args = " -isdf %s -h --partialcharge %s -O %s_withH.mol2" % (os.path.abspath(filesdf), cmethod, fnRoot)
-                Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+                args = " -isdf %s -h --partialcharge %s -O %s_prep.mol2" % (os.path.abspath(filesdf), cmethod, fnRoot)
+                runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
 
 
@@ -199,18 +200,17 @@ class Rosetta_ligand_preparation(EMProtocol):
 
         # 3. Generate mol2 conformers file for each molecule with OpenBabel
 
-        for file in glob.glob(self._getExtraPath("*_withH.mol2")):
-            fnRoot = re.split("_", os.path.split(file)[1])[0]  # ID or filename without _withH.mol2
+        for file in glob.glob(self._getExtraPath("*_prep.mol2")):
+            fnRoot = re.split("_", os.path.split(file)[1])[0]  # ID or filename without _prep.mol2
 
             if self.method_conf.get() == 0:  # Genetic algorithm
-                args =" %s --conformer --nconf %s --score rmsd --writeconformers " \
-                      "-O %s_conformers.mol2" %(os.path.abspath(file), str(self.number_conf.get()), fnRoot)
+                args = " %s --conformer --nconf %s --score rmsd --writeconformers -O %s_conformers.mol2" %\
+                       (os.path.abspath(file), str(self.number_conf.get()), fnRoot)
             else:  # confab
-                args = " %s -O %s_conformers.mol2 --confab --original --verbose " \
-                       "--conf %s --rcutoff %s" % (os.path.abspath(file), fnRoot, str(self.number_conf.get()),
-                                                  str(self.rmsd_cutoff.get()))
+                args = " %s --confab --original --verbose --conf %s --rcutoff %s -O %s_conformers.mol2" % \
+                       (os.path.abspath(file), str(self.number_conf.get()), str(self.rmsd_cutoff.get()), fnRoot)
 
-            Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+            runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
 
 
@@ -223,7 +223,7 @@ class Rosetta_ligand_preparation(EMProtocol):
                 for path in glob.glob(self._getExtraPath("*_conformers.mol2")):
                     file.write(os.path.abspath(path) + "\n")
             else:
-                for path in glob.glob(self._getExtraPath("*_withH.mol2")):
+                for path in glob.glob(self._getExtraPath("*_prep.mol2")):
                     file.write(os.path.abspath(path) + "\n")
 
 
@@ -258,8 +258,8 @@ class Rosetta_ligand_preparation(EMProtocol):
         outputSmallMolecules = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix='_for_DARC')
 
 
-        for fnSmall in glob.glob(self._getExtraPath("*_withH.mol2")):
-            fnRoot = re.split("_", os.path.split(fnSmall)[1])[0] # ID or filename without _withH.mol2
+        for fnSmall in glob.glob(self._getExtraPath("*_prep.mol2")):
+            fnRoot = re.split("_", os.path.split(fnSmall)[1])[0] # ID or filename without _prep.mol2
 
             smallMolecule = SmallMolecule(smallMolFilename=fnSmall)
 
@@ -313,7 +313,7 @@ class Rosetta_ligand_preparation(EMProtocol):
                     smallMolecule._ConformersFile = pwobj.String("Not generated")
 
                     # Path to getPath/params/<fnRoot>_conformers
-                    path_params = os.path.join(self._getPath(), "params", "%s_withH" % fnRoot)
+                    path_params = os.path.join(self._getPath(), "params", "%s_prep" % fnRoot)
 
                     path, dirs, files = next(os.walk(path_params))
                     file_count = len(files)
