@@ -70,15 +70,13 @@ class DARCViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualize with PyMol')
-        form.addParam('singleLigand', BooleanParam,
-                      default=False,
-                      label='Display single ligand: ',
-                      help='Display the target with a single ligand docked')
-        form.addParam('displayPymol', EnumParam, condition='not singleLigand',
+        group = form.addGroup('Pocket ligands')
+        group.addParam('displayPymol', EnumParam,
                       choices=self.getChoices(pymol=True), default=0,
                       label='Display docking on pocket result: ',
                       help='Docking results are grouped by their pocket, choose the one to visualize')
-        form.addParam('displayPymolSingle', EnumParam, condition='singleLigand',
+        group = form.addGroup('Single Ligand')
+        group.addParam('displayPymolSingle', EnumParam,
                       choices=self.getChoicesSingle(), default=0,
                       label='Display single ligand: ',
                       help='Display this single ligand with the target')
