@@ -38,19 +38,16 @@ The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 from pyworkflow.utils import Message, createLink
 from pyworkflow.protocol import params
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
-import pyworkflow.object as pwobj
 from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
+from pwchem.utils import splitConformerFile, runOpenBabel
 
-from operator import itemgetter
 import shutil
 import os, re
-import csv
 import glob
 
 from rosetta import Plugin
 from rosetta.constants import *
-from rosetta.objects import (DarcScore, SetScores)
 from ..convert import adt2agdGrid
 
 
@@ -133,7 +130,7 @@ class Rosetta_darc(EMProtocol):
                             "to use GPU")
 
         group = form.addGroup('Ligands')
-        group.addParam("ligands", params.PointerParam, pointerClass="SetOfSmallMolecules", #PDB of the ligands
+        group.addParam("inputLigands", params.PointerParam, pointerClass="SetOfSmallMolecules", #PDB of the ligands
                       label="Ligands to dock",
                       important=True,
                       allowsNull=False,
@@ -147,6 +144,9 @@ class Rosetta_darc(EMProtocol):
         group.addParam('inputPockets', params.PointerParam, pointerClass="SetOfPockets",
                        label='Input pockets:', condition='fromPockets',
                        help="The protein pockets to dock in")
+        group.addParam('mergeOutput', params.BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+                       label='Merge outputs from pockets:', condition='fromPockets',
+                       help="Merge the outputs from the different pockets")
         group = self._defineParamsRays(group)
 
         form.addSection('Docking')
@@ -232,7 +232,6 @@ class Rosetta_darc(EMProtocol):
         gridSteps = []
         if self.fromPockets:
             for pocket in self.inputPockets.get():
-                rayDir = self._getExtraPath('pocket_{}'.format(pocket.clone().getObjId()))
                 gId = self._insertFunctionStep('generateRaysStep', pocket.clone(), prerequisites=[cId])
                 gridSteps.append(gId)
         else:
@@ -240,20 +239,61 @@ class Rosetta_darc(EMProtocol):
           gridSteps.append(gId)
 
         darcSteps = []
-        for mol in self.ligands.get():
-            dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=gridSteps)
-            darcSteps.append(dId)
-        else:
-            dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=gridSteps)
-            darcSteps.append(dId)
-
+        usedBases = []
+        for mol in self.inputLigands.get():
+            if not mol.getMolBase() in usedBases:
+                for pocket in self.inputPockets.get():
+                    dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=gridSteps)
+                    darcSteps.append(dId)
+                usedBases.append(mol.getMolBase())
 
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
     def convertInputStep(self):
         if not self.shape_only.get():
-          adtGridName = self.grid.get().getFileName().split('/')[-1]
-          self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
+            adtGridName = self.grid.get().getFileName().split('/')[-1]
+            self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
+
+        # Generate params file that DARC will use to dock the ligand in the target protein
+        writtenFiles = []
+        with open(self._getExtraPath("molfile_list.txt"), "w+") as file:
+            for mol in self.inputLigands.get():
+                confFile = mol.getConformersFileName()
+                if confFile != None:
+                    if not 'mol2' in confFile or not 'sdf' in confFile:
+                        confFile = self.convertConformersFile(confFile, outExt='mol2')
+                    else:
+                        confFile = os.path.abspath(confFile)
+                else:
+                    molFile = mol.getFileName()
+                    if not 'mol2' in molFile or not 'sdf' in molFile:
+                        confFile = self.convertFile(molFile)
+                    else:
+                        confFile = os.path.abspath(molFile)
+
+                if confFile != None and not confFile in writtenFiles:
+                    file.write(confFile + "\n")
+                    writtenFiles.append(confFile)
+                elif confFile == None:
+                    file.write(os.path.abspath(mol.getFileName()) + "\n")
+                    writtenFiles.append(os.path.abspath(mol.getFileName()))
+
+        # 2. Launch batch_molfile_to_params.py for each file. It will generate a pdb file and params file
+        database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
+        args = " -d %s" % database_path
+        mol2params_path = os.path.join(Plugin.getHome(), ROSETTA_PARAMS_PATH, PARAMS_FILE)
+        args += " --script_path %s" % mol2params_path
+        mollist = os.path.abspath(self._getExtraPath("molfile_list.txt"))
+        args += " %s" % mollist
+
+        # Execute the program bach_molfile_to_params to create the params file that will be used by DARC programs
+        # It creates a directory called params with several directories, each one called as the mol2 file.
+        # Inside of each one, we can find:
+        #   - 000.params
+        #   - 000_conformers.pdb
+        #   - log.txt
+        Plugin.runRosettaProgram(Plugin.getProgram(BATCH_PARAMS_FILE, path=ROSETTA_PARAMS_PATH), args=args,
+                                 cwd=os.path.abspath(self._getExtraPath()))
 
 
     def generateRaysStep(self, pocket=None):
@@ -283,7 +323,7 @@ class Rosetta_darc(EMProtocol):
               Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES_GPU), args, cwd=rayDir)
 
 
-    def darcStep(self, ligand):
+    def darcStep(self, ligand, pocket):
         """ Launch a docking process with Rosetta DARC for each ligand
         """
 
@@ -293,97 +333,111 @@ class Rosetta_darc(EMProtocol):
         # Save compound with errors during docking
         compound_Error = []
 
-        for rayDir in self.getPocketDirs():  # Run DARC for each ligand in the set of small molecules (and his conformers)
-            # Create the args of the program and add protein file
-            args = ""
-            args += " -protein %s" % os.path.abspath(pdb_file)
+        rayDir = self.getPocketDirs(pocket)  # Run DARC for each ligand in the set of small molecules (and his conformers)
 
-            # Add ligand file
-            ligand_pdb = ligand.getPDBFileName()
-            args += " -ligand %s" % os.path.abspath(ligand_pdb)
+        # Create the args of the program and add protein file
+        args = ""
+        args += " -protein %s" % os.path.abspath(pdb_file)
 
-            # Add params ligand file which path is in the set
-            params_file = ligand.getParamsFileName()
-            args += " -extra_res_fa %s" % os.path.abspath(params_file)
 
-            # Check if params_file and ligand_pdb is available.
-            # If it is not we skip the molecule and start again with another oner
-            if ligand_pdb == "Not available" or params_file == "Not available":
-                continue
+        paramsDir = self.getParamsDir(ligand)
+        # Add ligand file
+        ligand_pdb = glob.glob(os.path.join(paramsDir, "*.pdb"))[0]
+        newLigandPDB = self.changeParamFileCode(ligand_pdb, ligand)
+        args += " -ligand %s" % os.path.abspath(newLigandPDB)
 
-            # Add protein ray file
-            ray_file = self.getRayFile(rayDir)
-            args += " -ray_file %s" % os.path.abspath(ray_file)
+        # Add params ligand file which path is in the set
+        params_file = glob.glob(os.path.join(paramsDir, "*.params"))[0]
+        newLigandParams = self.changeParamFileCode(params_file, ligand)
+        args += " -extra_res_fa %s" % os.path.abspath(newLigandParams)
 
-            # Shape only or with electrostatics charges
-            if self.shape_only.get():
-                args += " -darc_shape_only"
+        # Add protein ray file
+        ray_file = self.getRayFile(rayDir)
+        args += " -ray_file %s" % os.path.abspath(ray_file)
+
+        # Shape only or with electrostatics charges
+        if self.shape_only.get():
+            args += " -darc_shape_only"
+        else:
+            #args += " -add_electrostatics"
+
+            args += " -espGrid_file %s" % os.path.abspath(self.agdGrid.getFileName())
+
+        # Search conformers on the fly. DARC 2.0. Optimize conformer during docking
+        if self.search_conformers.get():
+            args += " -search_conformers True"
+
+        # Minimize the best scoring DARC output model and give some metrics more and
+        # Calculate ligand theta value during this minimization
+        if self.minimize_output.get():
+            args += " -minimize_output_complex True"
+            args += " -calculate_thetaLig True"
+
+        # Print Darc output ligand model with protein as PDB file
+        args += " -print_output_complex True"
+
+        # Append ligand file name to output files, instead of ligand code
+        args += " -use_ligand_filename"
+
+
+        # Use advanced options
+
+        args += " -num_runs %s" % self.num_runs.get()
+        args += " -num_particles %s" % self.num_particles.get()
+        args += " -missing_point_weight %s" % self.missing_weight.get()
+        args += " -steric_weight %s" % self.steric_weight.get()
+        args += " -extra_point_weight %s" % self.extra_weight.get()
+
+        if self.cseed.get():
+            args += " -run:constant_seed"
+            args += " -run:jran %s" % self.seed.get()
+
+        try:
+            # Run DARC w/wo GPU
+            if GPU_LIST == 0:
+                Plugin.runRosettaProgram(Plugin.getProgram(DARC), args, cwd=rayDir)
             else:
-                #args += " -add_electrostatics"
-
-                args += " -espGrid_file %s" % os.path.abspath(self.agdGrid.getFileName())
-
-            # Search conformers on the fly. DARC 2.0. Optimize conformer during docking
-            if self.search_conformers.get():
-                args += " -search_conformers True"
-
-            # Minimize the best scoring DARC output model and give some metrics more and
-            # Calculate ligand theta value during this minimization
-            if self.minimize_output.get():
-                args += " -minimize_output_complex True"
-                args += " -calculate_thetaLig True"
-
-            # Print Darc output ligand model with protein as PDB file
-            args += " -print_output_complex True"
-
-            # Append ligand file name to output files, instead of ligand code
-            args += " -use_ligand_filename"
-
-
-            # Use advanced options
-
-            args += " -num_runs %s" % self.num_runs.get()
-            args += " -num_particles %s" % self.num_particles.get()
-            args += " -missing_point_weight %s" % self.missing_weight.get()
-            args += " -steric_weight %s" % self.steric_weight.get()
-            args += " -extra_point_weight %s" % self.extra_weight.get()
-
-            if self.cseed.get():
-                args += " -run:constant_seed"
-                args += " -run:jran %s" % self.seed.get()
-
-            try:
-                # Run DARC w/wo GPU
-                if GPU_LIST == 0:
-                    Plugin.runRosettaProgram(Plugin.getProgram(DARC), args, cwd=rayDir)
-                else:
-                    args += " -gpu %s" % str(self.gpuList.get())
-                    Plugin.runRosettaProgram(Plugin.getProgram(DARC_GPU), args, cwd=rayDir)
-            except:
-                compound_Error.append(ligand_pdb)
+                args += " -gpu %s" % str(self.gpuList.get())
+                Plugin.runRosettaProgram(Plugin.getProgram(DARC_GPU), args, cwd=rayDir)
+        except:
+            compound_Error.append(ligand_pdb)
 
     def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
+        if self.checkSingleOutput():
+            print('Single output')
+            outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
 
         outDirs = self.getPocketDirs()
-        outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
         for outDir in outDirs:
+            savedMols = []
             gridId = self.getGridId(outDir)
+            if not self.checkSingleOutput():
+                outputSet = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix=gridId)
+
             pdbFiles = self.getLigandFiles(outDir)
-            for mol in self.ligands.get():
-                molName = mol.getMolName()
+            for mol in self.inputLigands.get():
+                molName = mol.getMolBase()
                 for pFile in pdbFiles:
-                    if molName.split('_')[0] in pFile:
+                    if molName in pFile and not molName in savedMols:
                         newMol = SmallMolecule()
                         newMol.copy(mol)
                         newMol.cleanObjId()
                         newMol.setGridId(gridId)
+                        newMol.setMolClass('Rosetta')
 
                         newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
                         shutil.copy(os.path.join(outDir, pFile), newPDBFile)
                         newMol.poseFile.set(newPDBFile)
                         outputSet.append(newMol)
-            self._defineOutputs(outputSmallMolecules=outputSet)
+                        savedMols.append(molName)
+            if not self.checkSingleOutput():
+              self._defineOutputs(**{'outputSmallMolecules_{}'.format(gridId): outputSet})
+              self._defineSourceRelation(self.inputLigands, outputSet)
+
+        if self.checkSingleOutput():
+          self._defineOutputs(outputSmallMolecules=outputSet)
+          self._defineSourceRelation(self.inputLigands, outputSet)
 
 
 ############################## UTILS ########################
@@ -465,11 +519,13 @@ class Rosetta_darc(EMProtocol):
                 return os.path.join(rayDir, file)
         return None
 
-    def getPocketDirs(self):
+    def getPocketDirs(self, pocket=None):
       dirs = []
       for lDir in os.listdir(self._getExtraPath()):
-          if lDir.startswith('pocket_'):
+          if pocket is None and lDir.startswith('pocket_'):
               dirs.append(self._getExtraPath(lDir))
+          elif pocket is not None and lDir.startswith('pocket_{}'.format(pocket.getObjId())):
+              return self._getExtraPath(lDir)
       return dirs
 
     def getScoreFiles(self):
@@ -491,5 +547,55 @@ class Rosetta_darc(EMProtocol):
             elif self.minimize_output.get() and file.startswith('mini_LIGAND'):
                 lFiles.append(file)
         return lFiles
+
+    def getParamsDir(self, mol):
+        for dir in os.listdir(self._getExtraPath('params')):
+            if mol.getMolBase() in dir:
+                return self._getExtraPath('params/{}'.format(dir))
+
+    def changeParamFileCode(self, file, ligand):
+        if file.endswith('.params'):
+            sep = '.'
+        elif file.endswith('.pdb'):
+            sep = '_'
+
+        ligandDir, ligandFn = os.path.split(file)
+        ligandCode = ligandFn.split(sep)[0]
+
+        newLigandFile = os.path.join(ligandDir, ligandFn.replace(ligandCode, ligand.getMolBase()))
+        if file != newLigandFile:
+            shutil.copy(file, newLigandFile)
+        return newLigandFile
+
+    def checkSingleOutput(self):
+        return self.mergeOutput.get() or len(self.getPocketDirs()) == 1
+
+    def convertFile(self, inFile, outExt='mol2'):
+        confName, ext = os.path.splitext(inFile)
+        oFile = inFile.replace(ext[1:], outExt)
+        args = ' -i{} {} -o{} -O {}'.format(ext[1:], inFile, outExt, oFile)
+        runOpenBabel(protocol=self, args=args, cwd=self._getTmpPath())
+        return oFile
+
+    def convertConformersFile(self, confFile, outExt='mol2'):
+        confName, ext = os.path.splitext(confFile)
+        outDir = self._getTmpPath(confName)
+        os.mkdir(outDir)
+        outDir = splitConformerFile(confFile, outDir)
+
+        formattedFiles = []
+        for inFile in os.listdir(outDir):
+            oFile = self.convertFile(inFile, outExt=outExt)
+            formattedFiles.append(oFile)
+
+        outConfFile = confFile.replace(ext[1:], outExt)
+        with open(outConfFile, 'w') as f:
+            for oFile in formattedFiles:
+                f.write(open(oFile).read() + '\n')
+
+        return outConfFile
+
+
+
 
 
