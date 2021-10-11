@@ -480,10 +480,8 @@ class Rosetta_darc(EMProtocol):
         return sFiles
 
     def getGridId(self, outDir):
-        if self.fromPockets:
-            return outDir.split('_')[-1]
-        else:
-            return '0'
+        return outDir.split('_')[-1]
+
 
     def getLigandFiles(self, outDir):
         lFiles = []
