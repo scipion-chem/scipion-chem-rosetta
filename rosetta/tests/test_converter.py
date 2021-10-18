@@ -66,7 +66,7 @@ class TestImportBase(BaseTest):
 
         protocol = cls.newProtocol(importSM, **args)
         cls.launchProtocol(protocol)
-        setofSM = protocol.outputSmallMols
+        setofSM = protocol.outputSmallMolecules
         return setofSM
 
 
@@ -90,7 +90,7 @@ class TestConverter(TestImportBase):
 
         protocol = self.newProtocol(converter, **args)
         self.launchProtocol(protocol)
-        small_1 = protocol.outputSmallMols
+        small_1 = protocol.outputSmallMolecules
 
         convert_file = glob.glob(protocol._getExtraPath("*"))
 
@@ -126,7 +126,7 @@ class TestConverter(TestImportBase):
 
         protocol = self.newProtocol(converter, **args)
         self.launchProtocol(protocol)
-        small_1 = protocol.outputSmallMols
+        small_1 = protocol.outputSmallMolecules
 
         convert_file = glob.glob(protocol._getExtraPath("*"))
 
