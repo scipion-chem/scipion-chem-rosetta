@@ -157,7 +157,7 @@ class ConvertStructures(EMProtocol):
 
             if len(outputSmallMolecules) > 0:
                 print("The following entries could not be converted: %s" % error)
-                self._defineOutputs(outputSmallMols=outputSmallMolecules)
+                self._defineOutputs(outputSmallMolecules=outputSmallMolecules)
                 self._defineSourceRelation(self.inputSmallMols, outputSmallMolecules)
 
         else:
