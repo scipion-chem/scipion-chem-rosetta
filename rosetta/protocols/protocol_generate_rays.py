@@ -331,7 +331,8 @@ class Rosetta_make_rayFile(EMProtocol):
             res = list(filter(None, re.split(",|;| ", residues_string.upper())))
 
             for residue in res:
-                if (int(residue) > no_res) or (int(residue) < 1):
+                residueNum = re.findall(r'\d+', residue)[0]
+                if (int(residueNum) > no_res) or (int(residueNum) < 1):
                     errors.append('The given residue number is outside the expected '
                                   'range of protein residues. The range of residues is'
                                   ' *[1, %i]*.' % no_res)
