@@ -157,27 +157,11 @@ class RosettaProtDARC(EMProtocol):
                           default=True,
                           important=True,
                           help="")
-            group = form.addGroup('Electrostatic grid', condition='not shape_only')
-            group.addParam('prevGrid', params.BooleanParam, label='Use a previously generated grid: ', default=False,
+            form.addParam("grid", params.PointerParam, pointerClass="GridADT",
                           condition="not shape_only",
-                           help='Use a previous ADT grid. If not, grids will be generated for each of the pockets or'
-                                'for the whole protein.')
-
-            group.addParam("grid", params.PointerParam, pointerClass="GridADT",
-                          condition="not shape_only and prevGrid",
                           label="Grid file", important=True, allowsNull=False,
                           help="Select the grid file")
 
-            group.addParam('radius', params.FloatParam, label='Grid radius for whole protein: ',
-                           allowsNull=False, condition="not shape_only and not prevGrid and not fromPockets",
-                           help='Radius of the Autodock grid for the whole protein.'
-                                'The wizard will provide for an approximation')
-            group.addParam('spacing', params.FloatParam, default=1, label='Step size (A)',
-                           condition='not shape_only and not prevGrid',
-                           help="Distance between each point in the electrostatic grid."
-                                " This value is used to adjust the radius as number of "
-                                "(x,y,z) points : radius/spacing = number of points along"
-                                " 3 dimensions ")
         else:
             self.shape_only = params.Boolean(True)
         
@@ -254,24 +238,15 @@ class RosettaProtDARC(EMProtocol):
     def _insertAllSteps(self):
         self.originalReceptorFile = self.getOriginalReceptorFile()
         # Insert processing steps
-        iniSteps = []
-        if not self.shape_only and not self.prevGrid:
-          self.eGridDic = {}
-          if self.fromPockets:
-            for pocket in self.inputPockets.get():
-                iniSteps.append(self._insertFunctionStep('generateElectrostaticsStep', pocket.clone(), prerequisites=[]))
-          else:
-              iniSteps.append(self._insertFunctionStep('generateElectrostaticsStep', prerequisites=[]))
-
-        cId = self._insertFunctionStep('convertInputStep', prerequisites=iniSteps)
-        gridSteps = []
+        cId = self._insertFunctionStep('convertInputStep', prerequisites=[])
+        raysSteps = []
         if self.fromPockets:
             for pocket in self.inputPockets.get():
                 gId = self._insertFunctionStep('generateRaysStep', pocket.clone(), prerequisites=[cId])
-                gridSteps.append(gId)
+                raysSteps.append(gId)
         else:
           gId = self._insertFunctionStep('generateRaysStep', prerequisites=[cId])
-          gridSteps.append(gId)
+          raysSteps.append(gId)
 
         darcSteps = []
         usedBases = []
@@ -279,57 +254,20 @@ class RosettaProtDARC(EMProtocol):
             if not mol.getMolBase() in usedBases:
                 if self.fromPockets:
                     for pocket in self.inputPockets.get():
-                        dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=gridSteps)
+                        dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
                         darcSteps.append(dId)
                 else:
-                    dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=gridSteps)
+                    dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=raysSteps)
                     darcSteps.append(dId)
                 usedBases.append(mol.getMolBase())
 
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
-    def generateElectrostaticsStep(self, pocket=None):
-          # Building grid(s)
-          pdbqtFile = self.getPDBQTReceptor()
-          if pocket != None:
-            outDir = self._getExtraPath('pocket_{}'.format(pocket.getObjId()))
-          else:
-            outDir = self._getExtraPath('pocket_1')
-          makePath(outDir)
-          radius = self.getGridRadius(pocket)
-          x_center, y_center, z_center = self.getGridCenter(pocket)
-
-          #npts = (radius * 2) / self.spacing.get()
-          npts = 110
-          forcedSpacing = (radius * 2) / npts
-          gpf_file = generate_gpf(pdbqtFile, spacing=forcedSpacing,
-                                  xc=x_center, yc=y_center, zc=z_center,
-                                  npts=npts, outDir=outDir)
-
-          args = "-p {} -l {}.glg".format(gpf_file, self.getReceptorName())
-          self.runJob(autodock_plugin.getAutodockPath("autogrid4"), args, cwd=outDir)
-
-          e_map_file = self.searchFile(outDir=outDir, pattern='.e.map')
-          self.eGridDic[e_map_file] = {'radius': radius, 'npts': npts,
-                                       'center': (x_center, y_center, z_center),
-                                       'spacing': forcedSpacing}
-
-
     def convertInputStep(self):
         #Converting the ADT grid to the Rosetta agd format
         if not self.shape_only:
-            if self.prevGrid:
-                adtGridName = self.grid.get().getFileName().split('/')[-1]
-                self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
-            else:
-                for emapFile in self.eGridDic:
-                    x_center, y_center, z_center = self.eGridDic[emapFile]['center']
-                    curGridADT = GridADT(emapFile, self.getOriginalReceptorFile(),
-                                         radius=self.eGridDic[emapFile]['radius'],
-                                         spacing=self.eGridDic[emapFile]['spacing'],
-                                         massCX=x_center, massCY=y_center, massCZ=z_center,
-                                         npts=self.eGridDic[emapFile]['npts'])
-                    self.agdGrid = adt2agdGrid(curGridADT, os.path.abspath(emapFile.replace('.e.map', '.agd')))
+            adtGridName = self.grid.get().getFileName().split('/')[-1]
+            self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
 
 
         # Generate params file that DARC will use to dock the ligand in the target protein
@@ -439,7 +377,7 @@ class RosettaProtDARC(EMProtocol):
         else:
             #args += " -add_electrostatics"
 
-            args += " -espGrid_file %s" % os.path.abspath(self.getAGDFile(rayDir, darc=True))
+            args += " -espGrid_file %s" % os.path.abspath(self.getAGDFile())
 
         # Search conformers on the fly. DARC 2.0. Optimize conformer during docking
         if self.search_conformers.get():
@@ -559,7 +497,7 @@ class RosettaProtDARC(EMProtocol):
 
         # To include electrostatics calculations
         if not self.shape_only:
-            grid_file = self.getAGDFile(outDir)
+            grid_file = self.getAGDFile()
             args += " -espGrid_file %s" % os.path.abspath(grid_file)
 
         else:
@@ -711,34 +649,9 @@ class RosettaProtDARC(EMProtocol):
           pdbqtFile = strFile
       return pdbqtFile
 
-    def getGridRadius(self, pocket=None):
-        if pocket==None:
-            radius = self.radius.get()
-        else:
-            radius = pocket.getDiameter() / 2
-        return radius
 
-    def getGridCenter(self, pocket):
-        if pocket == None:
-            pdbFile = self.getPDBReceptor()
-            structure, x_center, y_center, z_center = calculate_centerMass(pdbFile)
-        else:
-            x_center, y_center, z_center = pocket.calculateMassCenter()
-        return x_center, y_center, z_center
-
-    def getAGDFile(self, outDir=None, darc=False):
-        pattern = '.agd'
-        if darc:
-            pattern = 'DARC.*agd'
-        if not self.prevGrid:
-            return self.searchFile(outDir, pattern)
-        else:
-            return self.agdGrid.getFileName()
-
-    def searchFile(self, outDir, pattern):
-        for file in os.listdir(outDir):
-            if re.search(pattern, file) is not None:
-                return os.path.join(outDir, file)
+    def getAGDFile(self):
+        return self.agdGrid.getFileName()
 
 
 
