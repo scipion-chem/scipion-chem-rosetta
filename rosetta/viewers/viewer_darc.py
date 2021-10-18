@@ -31,14 +31,13 @@ import glob
 
 from tkinter import messagebox
 
-from pyworkflow.protocol.params import LabelParam, EnumParam, BooleanParam
+from pyworkflow.protocol.params import LabelParam, EnumParam
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
-from pwem.viewers import TableView, Chimera, ChimeraView
-import pyworkflow.utils as pwutils
-from pwchem.viewers import PyMolViewer
+from pwem.viewers import Chimera
+from pwchem.utils.utilsViewer import *
+from pwchem.viewers import DockingViewer
 
-from rosetta.protocols.protocol_darc import Rosetta_darc
-
+from rosetta.protocols.protocol_darc import RosettaProtDARC
 
 def errorWindow(tkParent, msg):
     try:
@@ -51,37 +50,23 @@ def errorWindow(tkParent, msg):
         print(("Error:", msg))
 
 
-class DARCViewer(ProtocolViewer):
+class DARCViewer(DockingViewer):
     """ Viewer for Rosetta program DARC
     """
-    _label = 'DARC Viewer'
+    _label = 'Viewer DARC docking'
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    _targets = [Rosetta_darc]
-    DARC_SCORE = 'darc_score.sc'
-
+    _targets = [RosettaProtDARC]
 
     def __init__(self,  **kwargs):
-        ProtocolViewer.__init__(self,  **kwargs)
-        # Get the complex files with the best ligand between all conformers given to darc
+        super().__init__(**kwargs)
+        # Get the complex files with the best ligand between all conformers given to darc (CHIMERA)
         self.complexDic, self.complexNames = self.getFilesDic(pattern="DARC*")
         self.ligansDic, self.ligandsNames = self.getFilesDic(pattern="LIGAND*")
         self.ligandsDic_mini, self.ligandsNames_mini = self.getFilesDic(pattern="mini_LIGAND*")
         self.complexDic_mini, self.complexNames_mini = self.getFilesDic(pattern="mini_*", subsPattern="mini_LIGAND*")
 
     def _defineParams(self, form):
-        form.addSection(label='Visualize with PyMol')
-        group = form.addGroup('Pocket ligands')
-        group.addParam('displayPymol', EnumParam,
-                      choices=self.getChoices(pymol=True), default=0,
-                      label='Display docking on pocket result: ',
-                      help='Docking results are grouped by their pocket, choose the one to visualize')
-        group = form.addGroup('Single Ligand')
-        group.addParam('displayPymolSingle', EnumParam,
-                      choices=self.getChoicesSingle(), default=0,
-                      label='Display single ligand: ',
-                      help='Display this single ligand with the target')
-
-
+        super()._defineParams(form)
         form.addSection(label='Visualize with ChimeraX')
         # group = form.addGroup('Overall results')
         view = form.addGroup("Visualization in Chimerax")
@@ -123,14 +108,16 @@ class DARCViewer(ProtocolViewer):
                           label="Choose a ligand: ",
                           help="")
 
+
     def _getVisualizeDict(self):
         return {
             'complex_v': self._visualizeComplex,
             'ligand_v': self._visualizeLigand,
             'complex_v_mini': self._visualize_miniComplex,
             'ligand_v_mini': self._visualize_miniLigand,
-            'displayPymol': self._viewPymol,
-            'displayPymolSingle': self._viewSinglePymol
+            'displayPymolSingle': self._viewSinglePymol,
+            'displayPymolMolecule': self._viewMoleculePymol,
+            'displayPymolPocket': self._viewPocketPymol,
         }
 
 
@@ -173,7 +160,7 @@ class DARCViewer(ProtocolViewer):
 
     def getFilesDic(self, pattern, subsPattern=None):
         filesDic, names = {}, []
-        for pDir in self.protocol.getPocketDirs():
+        for pDir in self.protocol.getAllPocketDirs():
             gridId = self.protocol.getGridId(pDir)
             files = glob.glob(os.path.join(pDir, pattern))
             #Substract files with the subspattern
@@ -187,102 +174,3 @@ class DARCViewer(ProtocolViewer):
                     filesDic[names[-1]] = f
         names.sort()
         return filesDic, names
-
-
-
-    def getChoicesSingle(self):
-      self.outputLigands = {}
-      for oAttr in self.protocol.iterOutputAttributes():
-        if 'outputSmallMolecules' in oAttr[0]:
-          molSet = getattr(self.protocol, oAttr[0])
-          for mol in molSet:
-            curMol = mol.clone()
-            pName = curMol.getUniqueName()
-            self.outputLigands[pName] = curMol
-
-      outputLabels = list(self.outputLigands.keys())
-      outputLabels.sort()
-      return outputLabels
-
-    def getChoices(self, pymol=True):
-      outputLabels = []
-      for oAttr in self.protocol.iterOutputAttributes():
-        outputLabels.append(oAttr[0])
-
-      outputLabels.sort()
-      if pymol and len(outputLabels) > 1:
-        outputLabels = ['All'] + outputLabels
-      return outputLabels
-
-    def _viewSinglePymol(self, e=None):
-      ligandLabel = self.getEnumText('displayPymolSingle')
-      mol = self.outputLigands[ligandLabel].clone()
-      pmlFile = self.protocol._getExtraPath('pocket_{}'.format(mol.getGridId())) + '/{}.pml'.format(ligandLabel)
-      self.writePmlFile(pmlFile, self.buildPMLDockingSingleStr(mol, ligandLabel, addTarget=True))
-
-      pymolV = PyMolViewer(project=self.getProject())
-      pymolV.visualize(os.path.abspath(pmlFile), cwd=os.path.dirname(pmlFile))
-
-    def _viewPymol(self, e=None):
-      if self.getEnumText('displayPymol') != 'All':
-        outName = self.getEnumText('displayPymol')
-        pmlFile = self.protocol._getPath('{}.pml'.format(outName))
-        pmlStr = self.buildPMLDockingsStr(outName)
-      else:
-        pmlFile = self.protocol._getPath('allOutputMols.pml')
-        outName = self.getChoices()[1]
-        pmlStr = self.buildPMLDockingsStr(outName)
-        for outName in self.getChoices()[2:]:
-          pmlStr += self.buildPMLDockingsStr(outName, addTarget=False)
-
-      self.writePmlFile(pmlFile, pmlStr)
-      pymolV = PyMolViewer(project=self.getProject())
-      pymolV.visualize(os.path.abspath(pmlFile), cwd=os.path.dirname(pmlFile))
-
-    def buildPMLDockingSingleStr(self, mol, molName, addTarget=True):
-      pmlStr = ''
-      if addTarget:
-        pmlStr = 'load {}\n'.format(os.path.abspath(self.protocol.getProteinFile()))
-
-      pdbFile = os.path.abspath(mol.getPoseFile())
-      pmlStr += 'load {}, {}\nhide spheres, {}\nshow sticks, {}\n'.format(pdbFile, molName, molName, molName)
-      return pmlStr
-
-    def buildPMLDockingsStr(self, outName, addTarget=True):
-      molSet = getattr(self.protocol, outName)
-      pmlStr = ''
-      if addTarget:
-        pmlStr = 'load {}\n'.format(os.path.abspath(self.protocol.getProteinFile()))
-      if not os.path.exists(self.getPDBsDir(outName)):
-        molDic = {}
-        for i, mol in enumerate(molSet):
-          pFile = os.path.abspath(mol.getPoseFile())
-          pName = mol.getUniqueName()
-          molDic[pName] = pFile
-
-        molKeys = list(molDic.keys())
-        molKeys.sort()
-        for molName in molKeys:
-          pFile = molDic[molName]
-          pmlStr += 'load {}, {}\ndisable {}\nhide spheres, {}\nshow sticks, {}\n'.format(
-            pFile, molName, molName, molName, molName).format(pFile, molName, molName)
-
-      else:
-        molFiles = list(os.listdir(self.getPDBsDir(outName)))
-        molFiles.sort()
-        for pdbFile in molFiles:
-          pFile = os.path.abspath(os.path.join(self.getPDBsDir(outName), pdbFile))
-          pName = pdbFile.split('.')[0]
-          pmlStr += 'load {}, {}\ndisable {}\n'.format(pFile, pName, pName)
-      return pmlStr
-
-    def writePmlFile(self, pmlFile, pmlStr):
-      with open(pmlFile, 'w') as f:
-        f.write(pmlStr)
-        f.write('zoom')
-      return pmlFile, pmlStr
-
-    def getPDBsDir(self, outName):
-      return self.protocol._getExtraPath(outName)
-
-

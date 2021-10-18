@@ -26,135 +26,104 @@
 # **************************************************************************
 
 
-
-import os
 from pathlib import Path
 
 from pyworkflow.tests import *
 from pyworkflow.protocol import *
-from pwem.protocols.protocol_import import ProtImportPdb
 
-from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation as PrepareProtein
-from rosetta.protocols.protocol_ligand_preparation import Rosetta_ligand_preparation as PrepareLigand
-from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile as makeRay
-from rosetta.protocols.protocol_darc import Rosetta_darc as darc
-
-from pwchem.protocols.protocol_import_smallMolecules import ProtChemImportSmallMolecules as importSM
-from autodock.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
+from pwem.protocols import ProtImportPdb, ProtSetFilter
+from rosetta.protocols import RosettaProteinPreparation, RosettaProtDARC
+from pwchem.protocols import ProtChemImportSmallMolecules, ProtChemOBabelPrepareLigands
 
 
 
 class TestImportBase(BaseTest):
-
     @classmethod
     def setUpClass(cls):
-        setupTestProject(cls)
-        path_test = Path(__file__).parent
-        cls.path_data = os.path.join(path_test, "data")
+      cls.ds = DataSet.getDataSet('model_building_tutorial')
+      cls.dsLig = DataSet.getDataSet("smallMolecules")
+
+      setupTestProject(cls)
+      cls._runImportPDB()
+      cls._runImportSmallMols()
+
+      cls._runPrepareLigandsOBabel()
+      cls._runPrepareLigandsADT()
+      cls._runPrepareReceptorADT()
 
     @classmethod
-    def _importPDB(cls, path):
-        inputPdbData = 1  # file
-        args = {'inputPdbData': inputPdbData,
-                'pdbFile': path
-                }
-
-        protocol = cls.newProtocol(ProtImportPdb, **args)
-        cls.launchProtocol(protocol)
-        pdb = protocol.outputPdb
-        return pdb
-
+    def _runImportSmallMols(cls):
+      cls.protImportSmallMols = cls.newProtocol(
+        ProtChemImportSmallMolecules,
+        filesPath=cls.dsLig.getFile('mol2'))
+      cls.launchProtocol(cls.protImportSmallMols)
 
     @classmethod
-    def _prepareProtein(cls, target):
-
-        args = {'inputAtomStruct': target,
-                'addH': True,
-                'waters': True,
-                'HETATM': True,
-                "rchains": True,
-                "chain_name": '{"Chain": "A", "Number of residues": 92, "Number of chains": 3}',
-                "cseed": True
-                }
-
-        protocol = cls.newProtocol(PrepareProtein, **args)
-        cls.launchProtocol(protocol)
-        pdb = protocol.outputStructure
-        return pdb
-
+    def _runImportPDB(cls):
+      cls.protImportPDB = cls.newProtocol(
+        ProtImportPdb,
+        inputPdbData=1,
+        pdbFile=cls.ds.getFile('PDBx_mmCIF/5ni1_noHETATM.pdb'))
+      cls.launchProtocol(cls.protImportPDB)
 
     @classmethod
-    def _makegrid(cls, target):
-        radius = 37
-        spacing = 0.5
-        args = {'inputAtomStruct': target,
-                'radius': radius,
-                'spacing': spacing
-                }
+    def _runPrepareLigandsOBabel(cls):
+      cls.protOBabel = cls.newProtocol(
+        ProtChemOBabelPrepareLigands,
+        inputType=0, method_charges=0,
+        inputSmallMols=cls.protImportSmallMols.outputSmallMolecules,
+        doConformers=True, method_conf=0, number_conf=2,
+        rmsd_cutoff=0.375)
 
-        protocol = cls.newProtocol(makeGrid, **args)
-        cls.launchProtocol(protocol)
-        gridAGD = protocol.outputGrid
-
-        return gridAGD
+      cls.launchProtocol(cls.protOBabel)
 
     @classmethod
-    def _makeray(self, prep_target):
+    def _runPrepareReceptorADT(cls):
+      cls.protPrepareReceptor = cls.newProtocol(
+        RosettaProteinPreparation,
+        inputStructure=cls.protImportPDB.outputPdb,
+        repair=3)
 
-        # Generate rays
-        target_residue = 61
+      cls.launchProtocol(cls.protPrepareReceptor)
 
-        args = {'inputAtomStruct': prep_target,
-                'gpuList': 0,  # Not GPU
-                'target_residue': target_residue,
-                'electrostatics': False,
-                'cseed': True}
+    def _runSetFilter(self, inProt, number, property):
+      protFilter = self.newProtocol(
+        ProtSetFilter,
+        operation=ProtSetFilter.CHOICE_RANKED,
+        threshold=number, rankingField=property)
+      protFilter.inputSet.set(inProt)
+      protFilter.inputSet.setExtended('outputPockets')
 
-        protocol = self.newProtocol(makeRay, **args)
-        self.launchProtocol(protocol)
-        ray_structure = protocol.outputStructure
-        ray_txt = protocol.outputRay_TXT
-
-        return ray_structure, ray_txt
+      self.launchProtocol(protFilter)
+      return protFilter
 
 
-    @classmethod
-    def _importSmallM(cls, path):
-        inputPdbData = 1  # file
-        args = {'multiple': inputPdbData,
-                'filesPath': path,
-                'filesPattern': '*'}
+    def _runDARC(self, pocketsProt=None):
+        if pocketsProt == None:
+            protAutoDock = self.newProtocol(
+                RosettaProtDARC,
+                wholeProt=True,
+                inputAtomStruct=self.protPrepareReceptor.outputStructure,
+                inputLibrary=self.protOBabel.outputSmallMolecules,
+                radius=37, gaRun=2,
+                numberOfThreads=8)
+            self.launchProtocol(protAutoDock)
+            smOut = getattr(protAutoDock, 'outputSmallMolecules', None)
+            self.assertIsNotNone(smOut)
 
-        protocol = cls.newProtocol(importSM, **args)
-        cls.launchProtocol(protocol)
-        setofSM = protocol.outputSmallMols
-        return setofSM
+        else:
+            protAutoDock = self.newProtocol(
+                RosettaProtDARC,
+                wholeProt=False,
+                inputPockets=pocketsProt.outputPockets,
+                inputLibrary=self.protPrepareLigand.outputSmallMolecules,
+                pocketRadiusN=2, gaRun=2,
+                numberOfThreads=8)
+            self.launchProtocol(protAutoDock)
+            smOut = getattr(protAutoDock, 'outputSmallMolecules_1', None)
+            self.assertIsNotNone(smOut)
 
-    @classmethod
-    def _prepareLigand(self, path_data):
-        ligand_path = os.path.abspath(os.path.join(path_data, "smallMolecules", "mol2"))
-
-        # Import SetOfSmallMolecules
-        smallM = self._importSmallM(ligand_path)
-
-        args = {'inputType': 0,  # SmallMolecules
-                'inputSmallMols': smallM,
-                'method_charges': 0,  # gasteiger
-                'conformer': True,
-                "method_conf": 0,
-                "number_conf": 100,
-                "rmsd_cutoff": 0.375,
-                }
-
-        protocol = self.newProtocol(PrepareLigand, **args)
-        self.launchProtocol(protocol)
-        small = protocol.outputSmallMols
-        return small
-
-    @classmethod
-    def NonZero(cls, path):
-        return os.path.isfile(path) and os.path.getsize(path) > 0
-
+        return protAutoDock
 
 
 class TestDARC(TestImportBase):
@@ -163,48 +132,5 @@ class TestDARC(TestImportBase):
         """ Complete Docking with GRID and search conformers on the fly
         """
         print("\n Complete Docking with GRID and search conformers on the fly \n")
-
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-
-        # Import PDB as Scipion object and prepare it
-        target = self._importPDB(prot_path)
-        prep_target = self._prepareProtein(target)
-
-        # Generate grid and rays
-        grid = self. _makegrid(prep_target)
-        ray_structure, ray_txt= self._makeray(target)
-
-        # Import 4 molecules as Scipion object and prepare it
-        set_small = self._prepareLigand(self.path_data)
-
-        args = {'protein': prep_target,
-                'gpuList': 1,  # Not GPU
-                'ligands': set_small,
-                'ray_file': ray_txt,
-                'shape_only': False,
-                'grid': grid,
-                'search_conformers': True,
-                'cseed': True}
-
-
-        protocol = self.newProtocol(darc, **args)
-        self.launchProtocol(protocol)
-        scores = protocol.DarcScores
-
-
-
-        self.assertIsNotNone(scores,
-                             "There was a problem with the entire docking)- Please check it")
-
-
-        self.assertTrue(scores.getSize() == 4,
-                        "There was a problem with Rosetta DARC. The number of complexes correctly evaluated "
-                        "is less than the number given ")
-
-        n_columns = len(list(scores.getFirstItem().getAttributes()))
-        self.assertTrue(n_columns == 2,
-                        "There is a incorrect number of columns. Therefore there are a lost of information")  # 4 fixed columns + 2 given
-
-
-
-
+        protDARC = self._runDARC()
+        self.launchProtocol(protDARC)

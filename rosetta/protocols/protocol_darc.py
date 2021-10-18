@@ -36,11 +36,21 @@ The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 
 
 from pyworkflow.utils import Message, createLink
+from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
-from pwchem.utils import splitConformerFile, runOpenBabel
+from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calculate_centerMass
+
+#Soft importing autodock for electrostatic grid generation
+try:
+    from autodock import Plugin as autodock_plugin
+    from autodock.objects import GridADT
+    ADTGrid = True
+except:
+    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
+    ADTGrid = False
 
 import shutil
 import os, re
@@ -52,7 +62,7 @@ from ..convert import adt2agdGrid
 
 
 
-class Rosetta_darc(EMProtocol):
+class RosettaProtDARC(EMProtocol):
     """
     This protocol uses a Rosetta suite program (named make_ray_files) to generate
     a RAY file for the input protein. To generate this ray-file we need to input
@@ -75,7 +85,7 @@ class Rosetta_darc(EMProtocol):
                     allowsNull=False,
                     help="Select the atomic structure of the prepared protein file")
 
-        form.addParam("target_residue", params.IntParam,
+        form.addParam("target_residue", params.StringParam,
                       label="Target residue",
                       important=True,  condition='not fromPockets',
                       allowsNull=False,
@@ -120,15 +130,6 @@ class Rosetta_darc(EMProtocol):
         """ Define the input parameters that will be used.
         """
         form.addSection(label=Message.LABEL_INPUT)
-
-        form.addHidden(GPU_LIST, params.StringParam,
-                       label='Choose GPU ID',
-                       default='1',
-                       help="GPU may have several cores. Set it one if "
-                            "you don't know what we are talking about but you have a GPU."
-                            "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
-                            "to use GPU")
-
         group = form.addGroup('Ligands')
         group.addParam("inputLigands", params.PointerParam, pointerClass="SetOfSmallMolecules", #PDB of the ligands
                       label="Ligands to dock",
@@ -150,19 +151,36 @@ class Rosetta_darc(EMProtocol):
         group = self._defineParamsRays(group)
 
         form.addSection('Docking')
-        form.addParam("shape_only", params.BooleanParam,
-                      label="Use only shape of protein and ligand",
-                      default=True,
-                      important=True,
-                      help="")
+        if ADTGrid:
+            form.addParam("shape_only", params.BooleanParam,
+                          label="Use only shape of protein and ligand",
+                          default=True,
+                          important=True,
+                          help="")
+            group = form.addGroup('Electrostatic grid', condition='not shape_only')
+            group.addParam('prevGrid', params.BooleanParam, label='Use a previously generated grid: ', default=False,
+                          condition="not shape_only",
+                           help='Use a previous ADT grid. If not, grids will be generated for each of the pockets or'
+                                'for the whole protein.')
 
-        form.addParam("grid", params.PointerParam, pointerClass="GridADT",
-                      condition="shape_only==False",
-                      label="Grid file",
-                      important=True,
-                      allowsNull=False,
-                      help="Select the grid file")
+            group.addParam("grid", params.PointerParam, pointerClass="GridADT",
+                          condition="not shape_only and prevGrid",
+                          label="Grid file", important=True, allowsNull=False,
+                          help="Select the grid file")
 
+            group.addParam('radius', params.FloatParam, label='Grid radius for whole protein: ',
+                           allowsNull=False, condition="not shape_only and not prevGrid and not fromPockets",
+                           help='Radius of the Autodock grid for the whole protein.'
+                                'The wizard will provide for an approximation')
+            group.addParam('spacing', params.FloatParam, default=1, label='Step size (A)',
+                           condition='not shape_only and not prevGrid',
+                           help="Distance between each point in the electrostatic grid."
+                                " This value is used to adjust the radius as number of "
+                                "(x,y,z) points : radius/spacing = number of points along"
+                                " 3 dimensions ")
+        else:
+            self.shape_only = params.Boolean(True)
+        
         form.addParam("search_conformers", params.BooleanParam,
                       label="Search conformers on the fly",
                       default=False,
@@ -223,12 +241,29 @@ class Rosetta_darc(EMProtocol):
                        help='Set a integer number as constant seed. The default one is 1111111 ')
 
         form.addParallelSection(threads=4, mpi=1)
+        form.addHidden(GPU_LIST, params.StringParam,
+                       label='Choose GPU ID',
+                       default='1',
+                       help="GPU may have several cores. Set it one if "
+                            "you don't know what we are talking about but you have a GPU."
+                            "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
+                            "to use GPU")
 
  # --------------------------- STEPS functions ------------------------------
 
     def _insertAllSteps(self):
+        self.originalReceptorFile = self.getOriginalReceptorFile()
         # Insert processing steps
-        cId = self._insertFunctionStep('convertInputStep', prerequisites=[])
+        iniSteps = []
+        if not self.shape_only and not self.prevGrid:
+          self.eGridDic = {}
+          if self.fromPockets:
+            for pocket in self.inputPockets.get():
+                iniSteps.append(self._insertFunctionStep('generateElectrostaticsStep', pocket.clone(), prerequisites=[]))
+          else:
+              iniSteps.append(self._insertFunctionStep('generateElectrostaticsStep', prerequisites=[]))
+
+        cId = self._insertFunctionStep('convertInputStep', prerequisites=iniSteps)
         gridSteps = []
         if self.fromPockets:
             for pocket in self.inputPockets.get():
@@ -242,17 +277,60 @@ class Rosetta_darc(EMProtocol):
         usedBases = []
         for mol in self.inputLigands.get():
             if not mol.getMolBase() in usedBases:
-                for pocket in self.inputPockets.get():
-                    dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=gridSteps)
+                if self.fromPockets:
+                    for pocket in self.inputPockets.get():
+                        dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=gridSteps)
+                        darcSteps.append(dId)
+                else:
+                    dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=gridSteps)
                     darcSteps.append(dId)
                 usedBases.append(mol.getMolBase())
 
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
+    def generateElectrostaticsStep(self, pocket=None):
+          # Building grid(s)
+          pdbqtFile = self.getPDBQTReceptor()
+          if pocket != None:
+            outDir = self._getExtraPath('pocket_{}'.format(pocket.getObjId()))
+          else:
+            outDir = self._getExtraPath('pocket_1')
+          makePath(outDir)
+          radius = self.getGridRadius(pocket)
+          x_center, y_center, z_center = self.getGridCenter(pocket)
+
+          #npts = (radius * 2) / self.spacing.get()
+          npts = 110
+          forcedSpacing = (radius * 2) / npts
+          gpf_file = generate_gpf(pdbqtFile, spacing=forcedSpacing,
+                                  xc=x_center, yc=y_center, zc=z_center,
+                                  npts=npts, outDir=outDir)
+
+          args = "-p {} -l {}.glg".format(gpf_file, self.getReceptorName())
+          self.runJob(autodock_plugin.getAutodockPath("autogrid4"), args, cwd=outDir)
+
+          e_map_file = self.searchFile(outDir=outDir, pattern='.e.map')
+          self.eGridDic[e_map_file] = {'radius': radius, 'npts': npts,
+                                       'center': (x_center, y_center, z_center),
+                                       'spacing': forcedSpacing}
+
+
     def convertInputStep(self):
-        if not self.shape_only.get():
-            adtGridName = self.grid.get().getFileName().split('/')[-1]
-            self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
+        #Converting the ADT grid to the Rosetta agd format
+        if not self.shape_only:
+            if self.prevGrid:
+                adtGridName = self.grid.get().getFileName().split('/')[-1]
+                self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
+            else:
+                for emapFile in self.eGridDic:
+                    x_center, y_center, z_center = self.eGridDic[emapFile]['center']
+                    curGridADT = GridADT(emapFile, self.getOriginalReceptorFile(),
+                                         radius=self.eGridDic[emapFile]['radius'],
+                                         spacing=self.eGridDic[emapFile]['spacing'],
+                                         massCX=x_center, massCY=y_center, massCZ=z_center,
+                                         npts=self.eGridDic[emapFile]['npts'])
+                    self.agdGrid = adt2agdGrid(curGridADT, os.path.abspath(emapFile.replace('.e.map', '.agd')))
+
 
         # Generate params file that DARC will use to dock the ligand in the target protein
         writtenFiles = []
@@ -260,13 +338,13 @@ class Rosetta_darc(EMProtocol):
             for mol in self.inputLigands.get():
                 confFile = mol.getConformersFileName()
                 if confFile != None:
-                    if not 'mol2' in confFile or not 'sdf' in confFile:
+                    if not 'mol2' in confFile and not 'sdf' in confFile:
                         confFile = self.convertConformersFile(confFile, outExt='mol2')
                     else:
                         confFile = os.path.abspath(confFile)
                 else:
                     molFile = mol.getFileName()
-                    if not 'mol2' in molFile or not 'sdf' in molFile:
+                    if not 'mol2' in molFile and not 'sdf' in molFile:
                         confFile = self.convertFile(molFile)
                     else:
                         confFile = os.path.abspath(molFile)
@@ -300,8 +378,8 @@ class Rosetta_darc(EMProtocol):
         """Generate the txt and pdb file with the protein pocket mapping around a given residue
         """
         if pocket != None:
-            rayDir = self._getExtraPath('pocket_{}'.format(pocket.clone().getObjId()))
-            os.mkdir(rayDir)
+            rayDir = self._getExtraPath('pocket_{}'.format(pocket.getObjId()))
+            makePath(rayDir)
             args = self.getRaysArgs(outDir=rayDir, pocket=pocket)
             # Generate 2 file with different formats (pdb (rays are hetatm) and txt).
             # Run Make Ray Files w/wo GPU
@@ -312,7 +390,7 @@ class Rosetta_darc(EMProtocol):
                 Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES_GPU), args, cwd=rayDir)
         else:
             rayDir = self._getExtraPath('pocket_1')
-            os.mkdir(rayDir)
+            makePath(rayDir)
             args = self.getRaysArgs(outDir=rayDir)
             # Generate 2 file with different formats (pdb (rays are hetatm) and txt).
             # Run Make Ray Files w/wo GPU
@@ -323,17 +401,17 @@ class Rosetta_darc(EMProtocol):
               Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES_GPU), args, cwd=rayDir)
 
 
-    def darcStep(self, ligand, pocket):
+    def darcStep(self, ligand, pocket=None):
         """ Launch a docking process with Rosetta DARC for each ligand
         """
 
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.getProteinFile()
+        pdb_file = self.getOriginalReceptorFile()
 
         # Save compound with errors during docking
         compound_Error = []
 
-        rayDir = self.getPocketDirs(pocket)  # Run DARC for each ligand in the set of small molecules (and his conformers)
+        rayDir = self.getPocketDir(pocket)  # Run DARC for each ligand in the set of small molecules (and his conformers)
 
         # Create the args of the program and add protein file
         args = ""
@@ -356,12 +434,12 @@ class Rosetta_darc(EMProtocol):
         args += " -ray_file %s" % os.path.abspath(ray_file)
 
         # Shape only or with electrostatics charges
-        if self.shape_only.get():
+        if self.shape_only:
             args += " -darc_shape_only"
         else:
             #args += " -add_electrostatics"
 
-            args += " -espGrid_file %s" % os.path.abspath(self.agdGrid.getFileName())
+            args += " -espGrid_file %s" % os.path.abspath(self.getAGDFile(rayDir, darc=True))
 
         # Search conformers on the fly. DARC 2.0. Optimize conformer during docking
         if self.search_conformers.get():
@@ -405,10 +483,9 @@ class Rosetta_darc(EMProtocol):
     def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
         if self.checkSingleOutput():
-            print('Single output')
             outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
 
-        outDirs = self.getPocketDirs()
+        outDirs = self.getAllPocketDirs()
         for outDir in outDirs:
             savedMols = []
             gridId = self.getGridId(outDir)
@@ -417,9 +494,9 @@ class Rosetta_darc(EMProtocol):
 
             pdbFiles = self.getLigandFiles(outDir)
             for mol in self.inputLigands.get():
-                molName = mol.getMolBase()
+                molName, molBase = mol.getUniqueName(), mol.getMolBase()
                 for pFile in pdbFiles:
-                    if molName in pFile and not molName in savedMols:
+                    if molBase in pFile and not molBase in savedMols:
                         newMol = SmallMolecule()
                         newMol.copy(mol)
                         newMol.cleanObjId()
@@ -430,7 +507,7 @@ class Rosetta_darc(EMProtocol):
                         shutil.copy(os.path.join(outDir, pFile), newPDBFile)
                         newMol.poseFile.set(newPDBFile)
                         outputSet.append(newMol)
-                        savedMols.append(molName)
+                        savedMols.append(molBase)
             if not self.checkSingleOutput():
               self._defineOutputs(**{'outputSmallMolecules_{}'.format(gridId): outputSet})
               self._defineSourceRelation(self.inputLigands, outputSet)
@@ -443,11 +520,11 @@ class Rosetta_darc(EMProtocol):
 ############################## UTILS ########################
     def getRaysArgs(self, outDir, pocket=None):
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.getProteinFile()
+        pdb_file = self.getOriginalReceptorFile()
         pdb_file_extra = os.path.join(outDir, os.path.basename(pdb_file))
         createLink(pdb_file, pdb_file_extra)
 
-        args = " -protein %s" % os.path.basename(pdb_file_extra)
+        args = "-protein %s" % os.path.basename(pdb_file)
 
         # Add Database path
         database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
@@ -458,17 +535,19 @@ class Rosetta_darc(EMProtocol):
         if pocket == None:
             if self.multiple_target.get():
                 residues_string = self.target_residues.get()
-                res = list(filter(None, re.split(",|;| ", residues_string.upper())))
+                res = list(set(list(filter(None, re.split(",|;| ", residues_string.upper()))) +
+                          [self.target_residue.get()]))
                 target_residues = ",".join(res)
                 # res = list(map(int, res))
-                args += " -central_relax_pdb_num %s,%s" % (self.target_residue.get(), target_residues)
+                args += " -central_relax_pdb_num %s" % (self.target_residue.get(), target_residues)
                 args += " -multiple_origin"
             else:
                 args += " -central_relax_pdb_num %s" % self.target_residue.get()
         else:
             residues = self.getPocketResidues(pocket)
+            residueNum = re.findall(r'\d+', residues)[0]
             args += " -central_relax_pdb_num %s" % (residues)
-            args += " -multiple_origin"
+            #args += " -multiple_origin"
 
         # By default the PocketGrid expands if pocket points are identified near the edge, this flag disables the autoexpanding feature.
         args += " -pocket_static_grid"
@@ -479,8 +558,8 @@ class Rosetta_darc(EMProtocol):
             args += "-origin_res_num %i" % (self.origin_residue.get())  # number of residue in a chain
 
         # To include electrostatics calculations
-        if not self.shape_only.get():
-            grid_file = self.agdGrid.getFileName()
+        if not self.shape_only:
+            grid_file = self.getAGDFile(outDir)
             args += " -espGrid_file %s" % os.path.abspath(grid_file)
 
         else:
@@ -500,16 +579,22 @@ class Rosetta_darc(EMProtocol):
 
     def getPocketResidues(self, pocket):
         resStr = ''
-        for residue in pocket.getMostCentralResidues():
+        for residue in pocket.getMostCentralResidues(n=1):
             resStr += self.switchResidueFormat(residue) + ','
         return resStr[:-1]
 
-    def getProteinFile(self):
-        if not self.fromPockets:
-          pdb_file = self.inputAtomStruct.get().getFileName()
+    def getOriginalReceptorFile(self):
+        if not hasattr(self, 'originalReceptorFile'):
+            if not self.fromPockets:
+                pdb_file = self.inputAtomStruct.get().getFileName()
+            else:
+                pdb_file = self.inputPockets.get().getProteinFile()
         else:
-          pdb_file = self.inputPockets.get().getProteinFile()
+            pdb_file = self.originalReceptorFile
         return pdb_file
+
+    def getReceptorName(self):
+        return self.getOriginalReceptorFile().split('/')[-1].split('.')[0]
 
     def getRayFile(self, rayDir=None):
         if rayDir==None:
@@ -519,13 +604,19 @@ class Rosetta_darc(EMProtocol):
                 return os.path.join(rayDir, file)
         return None
 
-    def getPocketDirs(self, pocket=None):
+    def getPocketDir(self, pocket=None):
+      if pocket is None:
+          return self._getExtraPath('pocket_1')
+      for lDir in os.listdir(self._getExtraPath()):
+          if lDir.startswith('pocket_{}'.format(pocket.getObjId())):
+              return self._getExtraPath(lDir)
+
+
+    def getAllPocketDirs(self):
       dirs = []
       for lDir in os.listdir(self._getExtraPath()):
-          if pocket is None and lDir.startswith('pocket_'):
+          if lDir.startswith('pocket_'):
               dirs.append(self._getExtraPath(lDir))
-          elif pocket is not None and lDir.startswith('pocket_{}'.format(pocket.getObjId())):
-              return self._getExtraPath(lDir)
       return dirs
 
     def getScoreFiles(self):
@@ -568,7 +659,7 @@ class Rosetta_darc(EMProtocol):
         return newLigandFile
 
     def checkSingleOutput(self):
-        return self.mergeOutput.get() or len(self.getPocketDirs()) == 1
+        return self.mergeOutput.get() or len(self.getAllPocketDirs()) == 1
 
     def convertFile(self, inFile, outExt='mol2'):
         confName, ext = os.path.splitext(inFile)
@@ -579,8 +670,8 @@ class Rosetta_darc(EMProtocol):
 
     def convertConformersFile(self, confFile, outExt='mol2'):
         confName, ext = os.path.splitext(confFile)
-        outDir = self._getTmpPath(confName)
-        os.mkdir(outDir)
+        outDir = self._getTmpPath(os.path.basename(confName))
+        makePath(outDir)
         outDir = splitConformerFile(confFile, outDir)
 
         formattedFiles = []
@@ -595,6 +686,59 @@ class Rosetta_darc(EMProtocol):
 
         return outConfFile
 
+    def getPDBReceptor(self):
+        strFile = self.getOriginalReceptorFile()
+        inName, inExt = os.path.splitext(os.path.basename(strFile))
+        if inExt != '.pdb':
+            pdbFile = os.path.abspath(self._getTmpPath('pdbInput.pdb'))
+            if not os.path.exists(pdbFile):
+                args = ' -i{} {} -opdb -O {}'.format(inExt[1:], os.path.abspath(strFile), pdbFile)
+                runOpenBabel(protocol=self, args=args, cwd=self._getTmpPath())
+        else:
+            pdbFile = strFile
+        return pdbFile
+
+    def getPDBQTReceptor(self):
+      strFile = self.getOriginalReceptorFile()
+      inName, inExt = os.path.splitext(os.path.basename(strFile))
+      if inExt != '.pdbqt':
+          pdbqtFile = os.path.abspath(self._getTmpPath('{}.pdbqt'.format(self.getReceptorName())))
+          if not os.path.exists(pdbqtFile):
+              args = ' -v -r %s -o %s' % (strFile, pdbqtFile)
+              self.runJob(autodock_plugin.getMGLPath('bin/pythonsh'),
+                          autodock_plugin.getADTPath('Utilities24/prepare_receptor4.py') + args)
+      else:
+          pdbqtFile = strFile
+      return pdbqtFile
+
+    def getGridRadius(self, pocket=None):
+        if pocket==None:
+            radius = self.radius.get()
+        else:
+            radius = pocket.getDiameter() / 2
+        return radius
+
+    def getGridCenter(self, pocket):
+        if pocket == None:
+            pdbFile = self.getPDBReceptor()
+            structure, x_center, y_center, z_center = calculate_centerMass(pdbFile)
+        else:
+            x_center, y_center, z_center = pocket.calculateMassCenter()
+        return x_center, y_center, z_center
+
+    def getAGDFile(self, outDir=None, darc=False):
+        pattern = '.agd'
+        if darc:
+            pattern = 'DARC.*agd'
+        if not self.prevGrid:
+            return self.searchFile(outDir, pattern)
+        else:
+            return self.agdGrid.getFileName()
+
+    def searchFile(self, outDir, pattern):
+        for file in os.listdir(outDir):
+            if re.search(pattern, file) is not None:
+                return os.path.join(outDir, file)
 
 
 

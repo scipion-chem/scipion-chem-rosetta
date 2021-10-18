@@ -5,3 +5,4 @@
 # **************************************************************************
 
 from .wizard_select_chain import GetChainsWizard
+from .wizard_radius import GetRadiusProteinRosetta
