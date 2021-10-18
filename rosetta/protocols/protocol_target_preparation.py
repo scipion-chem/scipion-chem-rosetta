@@ -233,7 +233,7 @@ class RosettaProteinPreparation(EMProtocol):
         # Create the args of the program
         args = ""
         args += " -in:file:"
-        args += "s %s" %pdb_file # PDB file to add missing atoms
+        args += "s %s" % pdb_file # PDB file to add missing atoms
 
         args += " -out:output -no_optH false"
 
@@ -249,13 +249,13 @@ class RosettaProteinPreparation(EMProtocol):
         #   - <PDB_INPUT_NAME>_0001.sc (scorefile (default by program ->default.sc))
         Plugin.runRosettaProgram(Plugin.getProgram(SCORE), args, cwd=self._getPath())
 
-
         #Move and rename the files to Path from the ExtraPath
-        shutil.move(self._getPath("%s_0001.pdb" % name_pdbfile), self._getPath("%s.pdb" % self.name_protein))
+        scoresFile = self._getPath("%s_0001.pdb" % name_pdbfile)
+        pdbOut = self._getPath("%s.pdb" % self.name_protein)
+        self.cleanScores(scoresFile, pdbOut)
         shutil.move(self._getPath("%s.sc" % name_pdbfile), self._getExtraPath("%s.sc" % self.name_protein))
 
         self._store()
-
 
 
     def createOutput(self):
@@ -369,5 +369,22 @@ class RosettaProteinPreparation(EMProtocol):
 
     def _citations(self):
         return ['LeaverFay2011']
+
+
+
+    def cleanScores(self, scoresFile, pdbOut):
+        with open(pdbOut, 'w') as f:
+            with open(scoresFile) as fIn:
+                for line in fIn:
+                    if self.isPDBLine(line):
+                        f.write(line)
+
+    def isPDBLine(self, line):
+        options = ['REMARK', 'ATOM', 'HETATM', 'HEADER', 'EXPDTA', 'TER', 'END']
+        for opt in options:
+          if line.startswith(opt):
+              return True
+        return False
+
 
 
