@@ -100,9 +100,10 @@ class TestImportBase(BaseTest):
       cls.protOBabel = cls.newProtocol(
         ProtChemOBabelPrepareLigands,
         inputType=0, method_charges=0,
-        inputSmallMols=cls.protImportSmallMols.outputSmallMolecules,
         doConformers=True, method_conf=0, number_conf=2,
         rmsd_cutoff=0.375)
+      cls.protOBabel.inputSmallMols.set(cls.protImportSmallMols)
+      cls.protOBabel.inputSmallMols.setExtended('outputSmallMolecules')
 
       cls.proj.launchProtocol(cls.protOBabel, wait=False)
 
@@ -110,9 +111,10 @@ class TestImportBase(BaseTest):
     def _runPrepareLigandsADT(cls):
       cls.protPrepareLigandADT = cls.newProtocol(
         ProtChemADTPrepareLigands,
-        inputSmallMols=cls.protImportSmallMols.outputSmallMolecules,
         doConformers=True, method_conf=0, number_conf=2,
         rmsd_cutoff=0.375)
+      cls.protPrepareLigandADT.inputSmallMols.set(cls.protImportSmallMols)
+      cls.protPrepareLigandADT.inputSmallMols.setExtended('outputSmallMolecules')
 
       cls.proj.launchProtocol(cls.protPrepareLigandADT, wait=False)
 
