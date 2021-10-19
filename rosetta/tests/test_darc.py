@@ -200,8 +200,7 @@ class TestImportBase(BaseTest):
                 protDARC.grid.setExtended('outputGrid')
 
             self.launchProtocol(protDARC)
-            smOut = getattr(protDARC, 'outputSmallMolecules', None)
-            self.assertIsNotNone(smOut)
+            self.assertIsNotNone(getattr(protDARC, 'outputSmallMolecules', None))
 
         else:
             protDARC = self.newProtocol(
@@ -223,8 +222,7 @@ class TestImportBase(BaseTest):
                 protDARC.grid.setExtended('outputGrid')
 
             self.launchProtocol(protDARC)
-            smOut = getattr(protDARC, 'outputSmallMolecules', None)
-            self.assertIsNotNone(smOut)
+            self.assertIsNotNone(getattr(protDARC, 'outputSmallMolecules', None))
 
         return protDARC
 
