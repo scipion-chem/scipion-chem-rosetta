@@ -275,24 +275,23 @@ class RosettaProtDARC(EMProtocol):
         with open(self._getExtraPath("molfile_list.txt"), "w+") as file:
             for mol in self.inputLigands.get():
                 confFile = mol.getConformersFileName()
-                if confFile != None:
+
+                if confFile != None and not confFile in writtenFiles:
+                    writtenFiles.append(confFile)
                     if not 'mol2' in confFile and not 'sdf' in confFile:
                         confFile = self.convertConformersFile(confFile, outExt='mol2')
                     else:
                         confFile = os.path.abspath(confFile)
-                else:
+                    file.write(os.path.abspath(confFile) + "\n")
+
+                elif confFile == None:
+                    writtenFiles.append(confFile)
                     molFile = mol.getFileName()
                     if not 'mol2' in molFile and not 'sdf' in molFile:
                         confFile = self.convertFile(molFile)
                     else:
                         confFile = os.path.abspath(molFile)
-
-                if confFile != None and not confFile in writtenFiles:
-                    file.write(confFile + "\n")
-                    writtenFiles.append(confFile)
-                elif confFile == None:
-                    file.write(os.path.abspath(mol.getFileName()) + "\n")
-                    writtenFiles.append(os.path.abspath(mol.getFileName()))
+                    file.write(os.path.abspath(confFile) + "\n")
 
         # 2. Launch batch_molfile_to_params.py for each file. It will generate a pdb file and params file
         database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
@@ -599,12 +598,14 @@ class RosettaProtDARC(EMProtocol):
     def checkSingleOutput(self):
         return self.mergeOutput.get() or len(self.getAllPocketDirs()) == 1
 
-    def convertFile(self, inFile, outExt='mol2'):
+    def convertFile(self, inFile, outExt='mol2', outDir=None):
+        if outDir == None:
+            outDir = self._getTmpPath()
         confName, ext = os.path.splitext(inFile)
         oFile = inFile.replace(ext[1:], outExt)
         args = ' -i{} {} -o{} -O {}'.format(ext[1:], inFile, outExt, oFile)
-        runOpenBabel(protocol=self, args=args, cwd=self._getTmpPath())
-        return oFile
+        runOpenBabel(protocol=self, args=args, cwd=outDir)
+        return os.path.join(outDir, oFile)
 
     def convertConformersFile(self, confFile, outExt='mol2'):
         confName, ext = os.path.splitext(confFile)
@@ -614,10 +615,10 @@ class RosettaProtDARC(EMProtocol):
 
         formattedFiles = []
         for inFile in os.listdir(outDir):
-            oFile = self.convertFile(inFile, outExt=outExt)
+            oFile = self.convertFile(inFile, outExt=outExt, outDir=outDir)
             formattedFiles.append(oFile)
 
-        outConfFile = confFile.replace(ext[1:], outExt)
+        outConfFile = os.path.join(outDir, os.path.basename(confFile.replace(ext[1:], outExt)))
         with open(outConfFile, 'w') as f:
             for oFile in formattedFiles:
                 f.write(open(oFile).read() + '\n')
