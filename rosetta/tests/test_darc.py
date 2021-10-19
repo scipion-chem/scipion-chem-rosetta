@@ -207,6 +207,7 @@ class TestImportBase(BaseTest):
             protDARC = self.newProtocol(
                 RosettaProtDARC,
                 fromPockets=True,
+                mergeOutput=True,
                 numberOfThreads=8)
 
             protDARC.inputPockets.set(self.protFilter)
@@ -242,10 +243,7 @@ class TestDARC(TestImportBase):
         print("\n Complete Docking from protein pockets and shape only \n")
         if pocketFinder!=None:
             self._waitOutput(self.protFilter, 'outputPockets', sleepTime=5)
-            if ADT:
-                protDARC = self._runDARC(ADTLigs=True, pocketsProt=self.protFilter)
-            else:
-                protDARC = self._runDARC(pocketsProt=self.protFilter)
+            protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.protFilter)
         else:
             print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'
                   'Test on pocket will not be performed')
