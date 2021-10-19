@@ -40,13 +40,13 @@ try:
         from p2rank.protocols import P2RankFindPockets
         pocketFinder = 'p2rank'
     except:
-        pocketFinder='autoligand'
+        pocketFinder = 'autoligand'
 except:
     print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
     ADT = False
     try:
         from fpocket.protocols import FpocketFindPockets
-        pocketFinder='fpocket'
+        pocketFinder = 'fpocket'
     except:
         print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'
               'Test on pocket will not be performed')
@@ -66,7 +66,7 @@ class TestImportBase(BaseTest):
 
       cls._runPrepareLigandsOBabel()
       cls._runPrepareReceptor()
-      cls._waitOutput(cls.protPrepareReceptor, 'outputSmallMolecules', sleepTime=5)
+      cls._waitOutput(cls.protOBabel, 'outputSmallMolecules', sleepTime=5)
       cls._waitOutput(cls.protPrepareReceptor, 'outputStructure', sleepTime=5)
 
       if ADT:
@@ -79,6 +79,8 @@ class TestImportBase(BaseTest):
           pocketProt = cls._runPocketFinder()
           cls._waitOutput(pocketProt, 'outputPockets', sleepTime=5)
           cls._runSetFilter(inProt=pocketProt, number=2, property='_score')
+
+      cls._waitOutput(cls.protPrepareLigandADT, 'outputSmallMolecules', sleepTime=5)
 
     @classmethod
     def _runImportSmallMols(cls):
@@ -233,7 +235,6 @@ class TestDARC(TestImportBase):
         """
         print("\n Complete Docking from whole protein and shape only \n")
         protDARC = self._runDARC()
-        self.launchProtocol(protDARC)
 
     def test_2(self):
         """ Complete Docking from protein pockets and shape only
@@ -245,7 +246,6 @@ class TestDARC(TestImportBase):
                 protDARC = self._runDARC(ADTLigs=True, pocketsProt=self.protFilter)
             else:
                 protDARC = self._runDARC(pocketsProt=self.protFilter)
-            self.launchProtocol(protDARC)
         else:
             print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'
                   'Test on pocket will not be performed')
@@ -257,7 +257,6 @@ class TestDARC(TestImportBase):
         if ADT:
             self._waitOutput(self.protGridADT, 'outputGrid', sleepTime=10)
             protDARC = self._runDARC(ADTLigs=True, gridProt=self.protGridADT)
-            self.launchProtocol(protDARC)
         else:
             print('Autodock cannot be imported, docking with electrostatics cannot be made')
 
@@ -268,6 +267,5 @@ class TestDARC(TestImportBase):
         if ADT:
           protDARC = self._runDARC(gridProt=self.protGridADT,
                                    pocketsProt=self.protFilter)
-          self.launchProtocol(protDARC)
         else:
           print('Autodock cannot be imported, docking with electrostatics cannot be made')
