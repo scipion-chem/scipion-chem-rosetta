@@ -45,13 +45,12 @@ from pwem.protocols import EMProtocol
 from pwem.objects.data import AtomStruct
 from pwem.convert.atom_struct import cifToPdb
 
-import os
-import shutil
-import glob
-import json
+import os, shutil, json, glob
 
 from rosetta import Plugin
 from rosetta.constants import *
+
+from pwchem.utils import clean_PDB
 
 
 class RosettaProteinPreparation(EMProtocol):
@@ -135,85 +134,18 @@ class RosettaProteinPreparation(EMProtocol):
     def remove_WLHC(self):
         """ Clean the pdb file from waters and ligands
         """
-
-        protein = self.inputAtomStruct
-
         # Get a PDB format file to the protein structure
-        pdb_ini = protein.get().getFileName()
+        pdb_ini = self.inputAtomStruct.get().getFileName()
         filename = os.path.splitext(os.path.basename(pdb_ini))[0]
-        fnPdb = self._getExtraPath('%s.pdb' % filename)
+        fnPdb = self._getExtraPath('%s_clean.pdb' % filename)
 
-        # Convert cif to pdb since Rosetta DARC program only can use PDB files
-        if pdb_ini.endswith('.cif'):
-            cifToPdb(pdb_ini, fnPdb)  # Rosetta DARC program only can use PDB files
-        else:
-            shutil.copy(pdb_ini, fnPdb)
-
-        # Consider different user options to clean the pdb and select the chain
-        if self.waters.get():
-            molecule_check = 'HOH'
-        #if self.HETATM.get():
-        #    ligand_check = ''
         if self.rchains.get():
             chain = json.loads(self.chain_name.get())  # From wizard dictionary
             chain_id = chain["Chain"].upper().strip()
-
-
-        # Parse and select the pdb file to clean it
-        pdb_file = self._getExtraPath('%s.pdb' % filename)
-        pdb_file_out = self._getExtraPath('%s_clean.pdb' % filename)
-
-        with open(pdb_file, "r") as pdb:
-            with open(pdb_file_out, "w+") as pdb_out:  # PDB where we write the cleaned atomic structure file
-                for line in pdb:
-                    column = line.split()
-                    try:
-                        id = column[0].strip()  # ATOM or HETATM
-                        molecule = column[3].strip()  # Water or not
-                        chain = column[4].strip()  # Name of chain
-
-                        if self.waters.get() and self.HETATM.get() and self.rchains.get():
-                            if id == 'ATOM' and chain == chain_id:
-                                pdb_out.write(line)
-                        elif self.waters.get() and self.HETATM.get() and not self.rchains.get():
-                            if id == 'ATOM':
-                                pdb_out.write(line)
-
-                        elif self.waters.get() and not self.HETATM.get() and self.rchains.get():
-                            if molecule != molecule_check and chain == chain_id:
-                                pdb_out.write(line)
-                        elif self.waters.get() and not self.HETATM.get() and not self.rchains.get():
-                            if molecule != molecule_check:
-                                pdb_out.write(line)
-
-                        elif not self.waters.get() and self.HETATM.get() and self.rchains.get():
-                            if id == "ATOM" and chain == chain_id:
-                                pdb_out.write(line)
-                            elif id == "HETATM" and molecule == "HOH" and chain == chain_id:
-                                pdb_out.write(line)
-
-                        elif not self.waters.get() and self.HETATM.get() and not self.rchains.get():
-                            if id == "ATOM":
-                                pdb_out.write(line)
-                            elif (id == "HETATM") and (molecule == "HOH"):
-                                print(molecule)
-                                pdb_out.write(line)
-
-
-
-                        elif not self.waters.get() and not self.HETATM.get() and self.rchains.get():
-                            if chain == chain_id:
-                                pdb_out.write(line)
-
-                        else:
-                            pdb_out.write(line)
-
-
-                        if id == "TER":
-                            pdb_out.write(line)
-
-                    except:
-                        pass
+        else:
+            chain_id = None
+        cleanedPDB = clean_PDB(self.inputAtomStruct.get(), fnPdb,
+                               self.waters.get(), self.HETATM.get(), chain_id)
 
 
     def score_optH(self):
