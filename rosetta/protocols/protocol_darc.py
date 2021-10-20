@@ -53,13 +53,13 @@ except:
     ADTGrid = False
 
 import shutil
-import os, re
+import os, re, subprocess
 import glob
 
 from rosetta import Plugin
 from rosetta.constants import *
 from ..convert import adt2agdGrid
-
+from rosetta.utils.batchParamsToMol_script import getBatchMolToParamsPath
 
 
 class RosettaProtDARC(EMProtocol):
@@ -306,10 +306,12 @@ class RosettaProtDARC(EMProtocol):
         # Inside of each one, we can find:
         #   - 000.params
         #   - 000_conformers.pdb
-        #   - log.txt
-        Plugin.runRosettaProgram(Plugin.getProgram(BATCH_PARAMS_FILE, path=ROSETTA_PARAMS_PATH), args=args,
+        #   - log.txtç+
+        batchParamsToMol_script = getBatchMolToParamsPath()
+        self.runJob('chmod', ' 755 {}'.format(batchParamsToMol_script),
+                         cwd=os.path.abspath(self._getExtraPath()))
+        Plugin.runRosettaProgram(batchParamsToMol_script, args=args,
                                  cwd=os.path.abspath(self._getExtraPath()))
-
 
     def generateRaysStep(self, pocket=None):
         """Generate the txt and pdb file with the protein pocket mapping around a given residue
