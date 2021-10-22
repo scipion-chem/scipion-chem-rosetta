@@ -38,6 +38,7 @@ The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 from pyworkflow.utils import Message, createLink
 from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
+import pyworkflow.object as pwobj
 from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
@@ -53,7 +54,7 @@ except:
     ADTGrid = False
 
 import shutil
-import os, re, subprocess
+import os, re
 import glob
 
 from rosetta import Plugin
@@ -427,6 +428,7 @@ class RosettaProtDARC(EMProtocol):
         outDirs = self.getAllPocketDirs()
         for outDir in outDirs:
             savedMols = []
+            scoresDic = self.parseScores(outDir)
             gridId = self.getGridId(outDir)
             if not self.checkSingleOutput():
                 outputSet = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix=gridId)
@@ -441,17 +443,21 @@ class RosettaProtDARC(EMProtocol):
                         newMol.cleanObjId()
                         newMol.setGridId(gridId)
                         newMol.setMolClass('Rosetta')
+                        newMol._score = pwobj.Float(scoresDic[molBase])
 
                         newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
                         shutil.copy(os.path.join(outDir, pFile), newPDBFile)
                         newMol.poseFile.set(newPDBFile)
                         outputSet.append(newMol)
                         savedMols.append(molBase)
+
             if not self.checkSingleOutput():
+              outputSet.proteinFile.set(self.getOriginalReceptorFile())
               self._defineOutputs(**{'outputSmallMolecules_{}'.format(gridId): outputSet})
               self._defineSourceRelation(self.inputLigands, outputSet)
 
         if self.checkSingleOutput():
+          outputSet.proteinFile.set(self.getOriginalReceptorFile())
           self._defineOutputs(outputSmallMolecules=outputSet)
           self._defineSourceRelation(self.inputLigands, outputSet)
 
@@ -652,9 +658,16 @@ class RosettaProtDARC(EMProtocol):
           pdbqtFile = strFile
       return pdbqtFile
 
-
     def getAGDFile(self):
         return self.agdGrid.getFileName()
+
+    def parseScores(self, outDir):
+        scoresDic = {}
+        with open(os.path.join(outDir, 'darc_score.sc')) as fIn:
+            for line in fIn:
+                code, score = line.split()
+                scoresDic[code.split('_')[1]] = score
+        return scoresDic
 
 
 
