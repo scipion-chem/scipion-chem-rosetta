@@ -436,7 +436,7 @@ class RosettaProtDARC(EMProtocol):
                 molName, molBase = mol.getUniqueName(), mol.getMolBase()
                 for pFile in pdbFiles:
                     if molBase in pFile and not molBase in savedMols:
-                        if (self.minimize_output and 'mini_' in pFile) or not self.minimize_output:
+                        if not self.minimize_output or 'mini_' in pFile:
                           newMol = SmallMolecule()
                           newMol.copy(mol)
                           newMol.cleanObjId()
