@@ -397,9 +397,7 @@ class RosettaProtDARC(EMProtocol):
         # Append ligand file name to output files, instead of ligand code
         args += " -use_ligand_filename"
 
-
         # Use advanced options
-
         args += " -num_runs %s" % self.num_runs.get()
         args += " -num_particles %s" % self.num_particles.get()
         args += " -missing_point_weight %s" % self.missing_weight.get()
@@ -438,25 +436,28 @@ class RosettaProtDARC(EMProtocol):
                 molName, molBase = mol.getUniqueName(), mol.getMolBase()
                 for pFile in pdbFiles:
                     if molBase in pFile and not molBase in savedMols:
-                        newMol = SmallMolecule()
-                        newMol.copy(mol)
-                        newMol.cleanObjId()
-                        newMol.setGridId(gridId)
-                        newMol.setMolClass('Rosetta')
-                        newMol._score = pwobj.Float(scoresDic[molBase])
+                        if (self.minimize_output and 'mini_' in pFile) or not self.minimize_output:
+                          newMol = SmallMolecule()
+                          newMol.copy(mol)
+                          newMol.cleanObjId()
+                          newMol.setGridId(gridId)
+                          newMol.setMolClass('Rosetta')
+                          newMol._energy = pwobj.Float(scoresDic[molBase])
 
-                        newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
-                        shutil.copy(os.path.join(outDir, pFile), newPDBFile)
-                        newMol.poseFile.set(newPDBFile)
-                        outputSet.append(newMol)
-                        savedMols.append(molBase)
+                          newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
+                          shutil.copy(os.path.join(outDir, pFile), newPDBFile)
+                          newMol.poseFile.set(newPDBFile)
+                          outputSet.append(newMol)
+                          savedMols.append(molBase)
 
             if not self.checkSingleOutput():
               outputSet.proteinFile.set(self.getOriginalReceptorFile())
+              outputSet.setDocked(True)
               self._defineOutputs(**{'outputSmallMolecules_{}'.format(gridId): outputSet})
               self._defineSourceRelation(self.inputLigands, outputSet)
 
         if self.checkSingleOutput():
+          outputSet.setDocked(True)
           outputSet.proteinFile.set(self.getOriginalReceptorFile())
           self._defineOutputs(outputSmallMolecules=outputSet)
           self._defineSourceRelation(self.inputLigands, outputSet)
@@ -564,13 +565,6 @@ class RosettaProtDARC(EMProtocol):
               dirs.append(self._getExtraPath(lDir))
       return dirs
 
-    def getScoreFiles(self):
-        sFiles = []
-        for file in os.listdir(self._getPath()):
-            if file.startswith('darc_score'):
-                sFiles.append(self._getPath(file))
-        return sFiles
-
     def getGridId(self, outDir):
         return outDir.split('_')[-1]
 
@@ -665,8 +659,12 @@ class RosettaProtDARC(EMProtocol):
         scoresDic = {}
         with open(os.path.join(outDir, 'darc_score.sc')) as fIn:
             for line in fIn:
-                code, score = line.split()
-                scoresDic[code.split('_')[1]] = score
+                if not self.minimize_output:
+                  code, score = line.split()[0], line.split()[1]
+                  scoresDic[code.split('_')[1]] = score
+                else:
+                  code, score = line.split()[1], line.split()[2]
+                  scoresDic[code.split('_')[1]] = score
         return scoresDic
 
 
