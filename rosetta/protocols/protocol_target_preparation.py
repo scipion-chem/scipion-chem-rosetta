@@ -144,7 +144,7 @@ class RosettaProteinPreparation(EMProtocol):
             chain_id = chain["Chain"].upper().strip()
         else:
             chain_id = None
-        cleanedPDB = clean_PDB(self.inputAtomStruct.get(), fnPdb,
+        cleanedPDB = clean_PDB(self.inputAtomStruct.get().getFileName(), fnPdb,
                                self.waters.get(), self.HETATM.get(), chain_id)
 
 

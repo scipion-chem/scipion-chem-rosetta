@@ -660,11 +660,10 @@ class RosettaProtDARC(EMProtocol):
         with open(os.path.join(outDir, 'darc_score.sc')) as fIn:
             for line in fIn:
                 if not self.minimize_output:
-                  code, score = line.split()[0], line.split()[1]
-                  scoresDic[code.split('_')[1]] = score
+                    code, score = line.split()[0], line.split()[1]
                 else:
-                  code, score = line.split()[1], line.split()[2]
-                  scoresDic[code.split('_')[1]] = score
+                    code, score = line.split()[1], line.split()[2]
+                scoresDic[code.split('_')[-2]] = score
         return scoresDic
 
 
