@@ -52,7 +52,6 @@ class Plugin(pwem.Plugin):
         """ Return and write a variable in the config file. Set the Rosetta path on the computer
         """
         cls._defineVar(ROSETTA_HOME, cls.getRosettaDir())
-        cls._defineVar("OPENBABEL_ENV_ACTIVATION", 'conda activate openbabel-env')
 
 
     @classmethod
@@ -85,42 +84,6 @@ class Plugin(pwem.Plugin):
         if extraEnvDict is not None:
             env.update(extraEnvDict)
         pwutils.runJob(None, program, args, env=env, cwd=cwd)
-
-    @classmethod
-    def getOpenbabelEnvActivation(cls):
-        activation = cls.getVar("OPENBABEL_ENV_ACTIVATION")
-        return activation
-
-    @classmethod
-    def addopenbabelPackage(cls, env, default=False):
-        OPENBABEL_INSTALLED = 'openbabel_installed'
-
-        # try to get CONDA activation command
-        installationCmd = cls.getCondaActivationCmd()
-
-        # Create the environment
-        installationCmd += ' conda install openbabel -c conda-forge &&'
-
-        # Flag installation finished
-        installationCmd += ' touch %s' % OPENBABEL_INSTALLED
-
-        openbabel_commands = [(installationCmd, OPENBABEL_INSTALLED)]
-
-        envPath = os.environ.get('PATH', "")  
-        installEnvVars = {'PATH': envPath} if envPath else None
-        env.addPackage('openbabel',
-                       tar='void.tgz',
-                       commands=openbabel_commands,
-                       neededProgs=cls.getDependencies(),
-                       default=default,
-                       vars=installEnvVars)
-
-    @classmethod
-    def runOPENBABEL(cls, protocol, program="obabel", args=None, cwd=None):
-        """ Run openbabel command from a given protocol. """
-        fullProgram = '%s %s && %s' % (cls.getCondaActivationCmd(), cls.getOpenbabelEnvActivation(), program)
-        fullProgram = "obabel"
-        protocol.runJob(fullProgram, args, env=cls.getEnviron(), cwd=cwd, numberOfThreads= 1)
 
     @classmethod
     def validateInstallation(cls):

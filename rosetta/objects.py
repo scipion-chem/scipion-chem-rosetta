@@ -31,13 +31,13 @@ import pwem.objects.data as data
 from autodock.objects import GridADT
 import math
 
-class RaysProtein(data.EMFile):
+class RosettaRaysProtein(data.EMFile):
     """ Represent a RAY file """
     def __init__(self, filename=None, **kwargs):
         data.EMFile.__init__(self, filename, **kwargs)
 
 
-class RaysStruct(data.AtomStruct):
+class RosettaRaysStruct(data.AtomStruct):
     """ Represent a RAY pdb file """
     def __init__(self, filename=None, pseudoatoms=False, **kwargs):
         data.AtomStruct.__init__(self, filename, pseudoatoms, **kwargs)
@@ -45,9 +45,10 @@ class RaysStruct(data.AtomStruct):
 
 class GridAGD(GridADT):
     """ Represent a grid file in agd (ASCIII) format """
-    def __init__(self, filename, **kwargs):
-        GridADT.__init__(self, filename, **kwargs)
-        self.parseFile()
+    def __init__(self, filename=None, **kwargs):
+        super().__init__(filename, **kwargs)
+        if filename != None:
+            self.parseFile()
 
     def parseFile(self):
         with open(self.getFileName()) as f:
@@ -59,7 +60,7 @@ class GridAGD(GridADT):
                     self.setNumberOfPoints(npts)
                 elif line.startswith('Spacing:'):
                     self.setSpacing(float(line.split()[1]))
-        self.setRadius(math.sqrt(npts * self.spacing))
+        self.setRadius(math.sqrt(npts * self.getSpacing()))
 
 
 class DarcScore(data.EMObject):

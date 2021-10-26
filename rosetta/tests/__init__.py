@@ -26,7 +26,6 @@
 
 
 from .test_target_preparation import TestTargetPreparation
-from .test_ligand_preparation import TestLigandPreparation
 from .test_converter import TestConverter
 from .test_generate_rays import TestRaysGeneration
 from .test_darc import TestDARC

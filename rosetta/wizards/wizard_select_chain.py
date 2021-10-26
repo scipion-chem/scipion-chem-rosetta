@@ -33,20 +33,12 @@ information such as name and number of residues.
 """
 
 # Imports
-from pyworkflow.gui import ListTreeProviderString, dialog
-from pyworkflow.object import String
-from pyworkflow.wizard import Wizard
-
-from pwem.convert import AtomicStructHandler
-from pwem.convert.atom_struct import cifToPdb
-
-import os
-
+from pwchem.wizards import GetChainsWizard
 from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation
 
 
 
-class GetChainsWizard(Wizard):
+class GetChainsWizardRosetta(GetChainsWizard):
     """
     This wizard will extract the chains from a atomic structure (pdb) file in
     order to select it in the protocol.
@@ -56,58 +48,3 @@ class GetChainsWizard(Wizard):
 
     # list with tuples to target protocol parameters
     _targets = [(RosettaProteinPreparation, ['chain_name'])]
-
-
-    def getChain_Information(self, protocol):
-        """ Function that return the information about the different
-            chains in a atomic structure using the class AtomicStructHandler.
-        """
-
-        # Help about AtomicStructHandler:
-        # Given an atomic structure returns two dictionaries:
-        #             (1) for all models and respective chains (chainID and length of residues)
-        #             (2) for each chain list of residues
-
-        structureHandler = AtomicStructHandler()
-
-        if protocol.inputpdb.get() is not None:
-            filename = os.path.abspath(protocol.inputpdb.get().getFileName())
-
-
-        structureHandler.read(filename)
-        structureHandler.getStructure()
-
-        chains, residues = structureHandler.getModelsChains()
-
-        chainInf = []  # List to save the chain information in a "list"
-        n_chains = len(list(chains.items())[0][1])
-        for model, chainDic in chains.items():
-            for ID, resnumber in chainDic.items():
-                chainInf.append(
-                    '{"Chain": "%s", "Number of residues": %d, "Number of chains": %d}' %
-                    (str(ID), resnumber, n_chains))
-
-        return chainInf
-
-
-
-    def show(self, form, *params):
-        """Show and select a chain"""
-
-        protocol = form.protocol
-        try:
-            chainInf = self.getChain_Information(protocol)
-        except Exception as e:
-            print("ERROR: ", "A pdb file was not entered in the Atomic structure field. Please enter it.", e)
-            return
-
-        # This are the chains:
-        chainList = []
-        for chain in chainInf:
-            chainList.append(String(chain))
-
-        # Get a data provider from the greetings to be used in the tree (dialog)
-        provider = ListTreeProviderString(chainList)
-        dlg = dialog.ListDialog(form.root, "Model chains", provider,
-                                "Select one of the chains")
-        form.setVar('chain_name', dlg.values[0].get())

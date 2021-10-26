@@ -45,13 +45,12 @@ from pwem.protocols import EMProtocol
 from pwem.objects.data import AtomStruct
 from pwem.convert.atom_struct import cifToPdb
 
-import os
-import shutil
-import glob
-import json
+import os, shutil, json, glob
 
 from rosetta import Plugin
 from rosetta.constants import *
+
+from pwchem.utils import clean_PDB
 
 
 class RosettaProteinPreparation(EMProtocol):
@@ -72,7 +71,7 @@ class RosettaProteinPreparation(EMProtocol):
         """
         form.addSection(label=Message.LABEL_INPUT)
 
-        form.addParam("inputpdb", params.PointerParam, pointerClass="AtomStruct",
+        form.addParam("inputAtomStruct", params.PointerParam, pointerClass="AtomStruct",
                       label="Atomic structure",
                       important=True, allowsNull=False,
                       help="Select the atomic structure of the docking target protein")
@@ -135,85 +134,18 @@ class RosettaProteinPreparation(EMProtocol):
     def remove_WLHC(self):
         """ Clean the pdb file from waters and ligands
         """
-
-        protein = self.inputpdb
-
         # Get a PDB format file to the protein structure
-        pdb_ini = protein.get().getFileName()
+        pdb_ini = self.inputAtomStruct.get().getFileName()
         filename = os.path.splitext(os.path.basename(pdb_ini))[0]
-        fnPdb = self._getExtraPath('%s.pdb' % filename)
+        fnPdb = self._getExtraPath('%s_clean.pdb' % filename)
 
-        # Convert cif to pdb since Rosetta DARC program only can use PDB files
-        if pdb_ini.endswith('.cif'):
-            cifToPdb(pdb_ini, fnPdb)  # Rosetta DARC program only can use PDB files
-        else:
-            shutil.copy(pdb_ini, fnPdb)
-
-        # Consider different user options to clean the pdb and select the chain
-        if self.waters.get():
-            molecule_check = 'HOH'
-        #if self.HETATM.get():
-        #    ligand_check = ''
         if self.rchains.get():
             chain = json.loads(self.chain_name.get())  # From wizard dictionary
             chain_id = chain["Chain"].upper().strip()
-
-
-        # Parse and select the pdb file to clean it
-        pdb_file = self._getExtraPath('%s.pdb' % filename)
-        pdb_file_out = self._getExtraPath('%s_clean.pdb' % filename)
-
-        with open(pdb_file, "r") as pdb:
-            with open(pdb_file_out, "w+") as pdb_out:  # PDB where we write the cleaned atomic structure file
-                for line in pdb:
-                    column = line.split()
-                    try:
-                        id = column[0].strip()  # ATOM or HETATM
-                        molecule = column[3].strip()  # Water or not
-                        chain = column[4].strip()  # Name of chain
-
-                        if self.waters.get() and self.HETATM.get() and self.rchains.get():
-                            if id == 'ATOM' and chain == chain_id:
-                                pdb_out.write(line)
-                        elif self.waters.get() and self.HETATM.get() and not self.rchains.get():
-                            if id == 'ATOM':
-                                pdb_out.write(line)
-
-                        elif self.waters.get() and not self.HETATM.get() and self.rchains.get():
-                            if molecule != molecule_check and chain == chain_id:
-                                pdb_out.write(line)
-                        elif self.waters.get() and not self.HETATM.get() and not self.rchains.get():
-                            if molecule != molecule_check:
-                                pdb_out.write(line)
-
-                        elif not self.waters.get() and self.HETATM.get() and self.rchains.get():
-                            if id == "ATOM" and chain == chain_id:
-                                pdb_out.write(line)
-                            elif id == "HETATM" and molecule == "HOH" and chain == chain_id:
-                                pdb_out.write(line)
-
-                        elif not self.waters.get() and self.HETATM.get() and not self.rchains.get():
-                            if id == "ATOM":
-                                pdb_out.write(line)
-                            elif (id == "HETATM") and (molecule == "HOH"):
-                                print(molecule)
-                                pdb_out.write(line)
-
-
-
-                        elif not self.waters.get() and not self.HETATM.get() and self.rchains.get():
-                            if chain == chain_id:
-                                pdb_out.write(line)
-
-                        else:
-                            pdb_out.write(line)
-
-
-                        if id == "TER":
-                            pdb_out.write(line)
-
-                    except:
-                        pass
+        else:
+            chain_id = None
+        cleanedPDB = clean_PDB(self.inputAtomStruct.get().getFileName(), fnPdb,
+                               self.waters.get(), self.HETATM.get(), chain_id)
 
 
     def score_optH(self):
@@ -233,7 +165,7 @@ class RosettaProteinPreparation(EMProtocol):
         # Create the args of the program
         args = ""
         args += " -in:file:"
-        args += "s %s" %pdb_file # PDB file to add missing atoms
+        args += "s %s" % pdb_file # PDB file to add missing atoms
 
         args += " -out:output -no_optH false"
 
@@ -249,13 +181,13 @@ class RosettaProteinPreparation(EMProtocol):
         #   - <PDB_INPUT_NAME>_0001.sc (scorefile (default by program ->default.sc))
         Plugin.runRosettaProgram(Plugin.getProgram(SCORE), args, cwd=self._getPath())
 
-
         #Move and rename the files to Path from the ExtraPath
-        shutil.move(self._getPath("%s_0001.pdb" % name_pdbfile), self._getPath("%s.pdb" % self.name_protein))
+        scoresFile = self._getPath("%s_0001.pdb" % name_pdbfile)
+        pdbOut = self._getPath("%s.pdb" % self.name_protein)
+        self.cleanScores(scoresFile, pdbOut)
         shutil.move(self._getPath("%s.sc" % name_pdbfile), self._getExtraPath("%s.sc" % self.name_protein))
 
         self._store()
-
 
 
     def createOutput(self):
@@ -274,7 +206,7 @@ class RosettaProteinPreparation(EMProtocol):
         if os.path.exists(os.path.expanduser(pdb_file_out)):
             target = AtomStruct(filename=pdb_file_out)
             self._defineOutputs(outputStructure=target)
-            self._defineSourceRelation(self.inputpdb, target)
+            self._defineSourceRelation(self.inputAtomStruct, target)
 
 
 
@@ -285,7 +217,7 @@ class RosettaProteinPreparation(EMProtocol):
         """
         errors = []
 
-        if self.inputpdb.get() is None:
+        if self.inputAtomStruct.get() is None:
             errors.append("A pdb file was not entered in the Atomic structure field. Please enter it.")
 
         # Check that the program exists
@@ -369,5 +301,22 @@ class RosettaProteinPreparation(EMProtocol):
 
     def _citations(self):
         return ['LeaverFay2011']
+
+
+
+    def cleanScores(self, scoresFile, pdbOut):
+        with open(pdbOut, 'w') as f:
+            with open(scoresFile) as fIn:
+                for line in fIn:
+                    if self.isPDBLine(line):
+                        f.write(line)
+
+    def isPDBLine(self, line):
+        options = ['REMARK', 'ATOM', 'HETATM', 'HEADER', 'EXPDTA', 'TER', 'END']
+        for opt in options:
+          if line.startswith(opt):
+              return True
+        return False
+
 
 

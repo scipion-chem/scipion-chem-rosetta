@@ -47,7 +47,7 @@ import re
 
 from rosetta import Plugin
 from rosetta.constants import *
-from rosetta.objects import RaysProtein, RaysStruct, GridAGD
+from rosetta.objects import RosettaRaysProtein, RosettaRaysStruct, GridAGD
 from ..convert import adt2agdGrid
 
 
@@ -77,7 +77,7 @@ class Rosetta_make_rayFile(EMProtocol):
                             "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
                             "to use GPU")
 
-        form.addParam("inputpdb", params.PointerParam, pointerClass="AtomStruct",
+        form.addParam("inputAtomStruct", params.PointerParam, pointerClass="AtomStruct",
                       label="Atomic structure",
                       important=True,
                       allowsNull=False,
@@ -172,7 +172,7 @@ class Rosetta_make_rayFile(EMProtocol):
         args = ""
 
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.inputpdb.get().getFileName()
+        pdb_file = self.inputAtomStruct.get().getFileName()
         pdb_file_extra = os.path.join(self._getExtraPath(), os.path.basename(pdb_file))
         createLink(pdb_file, pdb_file_extra)
 
@@ -237,7 +237,7 @@ class Rosetta_make_rayFile(EMProtocol):
         """
         #Create filename
 
-        pdb_ini = self.inputpdb.get().getFileName()
+        pdb_ini = self.inputAtomStruct.get().getFileName()
         filename = os.path.splitext(os.path.basename(pdb_ini))[0]
         target_res = self.target_residue.get()
 
@@ -263,8 +263,8 @@ class Rosetta_make_rayFile(EMProtocol):
 
 
         if os.path.exists(os.path.abspath(pdb_file_out)) and os.path.exists(os.path.abspath(txt_file_out)):
-            target = RaysStruct(filename=pdb_file_out)
-            rayfile = RaysProtein(filename=txt_file_out)
+            target = RosettaRaysStruct(filename=pdb_file_out)
+            rayfile = RosettaRaysProtein(filename=txt_file_out)
         else:
             raise Exception("Something wrong in output creation")
 
@@ -280,7 +280,7 @@ class Rosetta_make_rayFile(EMProtocol):
             outputdict={'outputStructure': target, 'outputRay_TXT': rayfile}
 
         self._defineOutputs(**outputdict)
-        self._defineSourceRelation(self.inputpdb, target)
+        self._defineSourceRelation(self.inputAtomStruct, target)
 
 
 
@@ -310,7 +310,7 @@ class Rosetta_make_rayFile(EMProtocol):
         """
         errors = []
 
-        no_res = self.length_residues_pdb(self.inputpdb.get().getFileName())
+        no_res = self.length_residues_pdb(self.inputAtomStruct.get().getFileName())
         no_res_center = self.target_residue.get()
         no_res_origin = self.origin_residue.get()
 
@@ -331,7 +331,8 @@ class Rosetta_make_rayFile(EMProtocol):
             res = list(filter(None, re.split(",|;| ", residues_string.upper())))
 
             for residue in res:
-                if (int(residue) > no_res) or (int(residue) < 1):
+                residueNum = re.findall(r'\d+', residue)[0]
+                if (int(residueNum) > no_res) or (int(residueNum) < 1):
                     errors.append('The given residue number is outside the expected '
                                   'range of protein residues. The range of residues is'
                                   ' *[1, %i]*.' % no_res)

@@ -26,19 +26,18 @@
 # **************************************************************************
 
 
-import os
+import os, subprocess
 import glob
 
 from tkinter import messagebox
 
 from pyworkflow.protocol.params import LabelParam, EnumParam
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
-from pwem.viewers import TableView, Chimera, ChimeraView
-import pyworkflow.utils as pwutils
+from pwem.viewers import Chimera
+from pwchem.utils.utilsViewer import *
+from pwchem.viewers import DockingViewer
 
-from rosetta import Plugin
-from rosetta.protocols.protocol_darc import Rosetta_darc
-
+from rosetta.protocols.protocol_darc import RosettaProtDARC
 
 def errorWindow(tkParent, msg):
     try:
@@ -51,75 +50,31 @@ def errorWindow(tkParent, msg):
         print(("Error:", msg))
 
 
-class DARCViewer(ProtocolViewer):
+class DARCViewer(DockingViewer):
     """ Viewer for Rosetta program DARC
     """
-    _label = 'DARC Viewer'
+    _label = 'Viewer DARC docking'
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    _targets = [Rosetta_darc]
-    DARC_SCORE = 'darc_score.sc'
-
+    _targets = [RosettaProtDARC]
 
     def __init__(self,  **kwargs):
-        ProtocolViewer.__init__(self,  **kwargs)
-
-        # Get the DARC score file
-        self.DARC_SCORE = self.protocol._getPath(self.DARC_SCORE)
-
-        # Get the complex files with the best ligand between all conformers given to darc
-        self.darc_complex = glob.glob(os.path.join(self.protocol._getExtraPath(), "darc_complex","*"))
-        self.COMPLEX = [os.path.basename(i) for i in self.darc_complex]
-
-        # Get the used and chosen ligands files between all conformers given to darc
-        self.darc_ligands = glob.glob(os.path.join(self.protocol._getExtraPath(), "ligands", "*"))
-        self.LIGANDS = [os.path.basename(i) for i in self.darc_ligands]
-
-
-        if self.protocol.minimize_output.get():
-            # Get the complex files with the best ligand between all conformers given to darc
-            self.mini_complex = glob.glob(os.path.join(self.protocol._getExtraPath(), "minimization", "darc_complex", "*"))
-            self.COMPLEX_mini = [os.path.basename(i) for i in self.mini_complex]
-            # Get the used and chosen ligands files between all conformers given to darc
-            self.mini_ligands = glob.glob(os.path.join(self.protocol._getExtraPath(), "minimization", "ligands", "*"))
-            self.LIGANDS_mini = [os.path.basename(i) for i in self.mini_ligands]
-
-
-        with open(self.DARC_SCORE) as score_file:
-            results = score_file.readlines()
-            results = [x.strip().split("\t") for x in results]
-            self.headerList = results[0]
-            self.dataList = results[1:]
-
-
+        super().__init__(**kwargs)
+        # Get the complex files with the best ligand between all conformers given to darc (CHIMERA)
+        self.complexDic, self.complexNames = self.getFilesDic(pattern="DARC*")
+        self.ligansDic, self.ligandsNames = self.getFilesDic(pattern="LIGAND*")
+        self.ligandsDic_mini, self.ligandsNames_mini = self.getFilesDic(pattern="mini_LIGAND*")
+        self.complexDic_mini, self.complexNames_mini = self.getFilesDic(pattern="mini_*", subsPattern="mini_LIGAND*")
 
     def _defineParams(self, form):
-        form.addSection(label='DARC results')
+        super()._defineParams(form)
+        form.addSection(label='Visualize with ChimeraX')
         # group = form.addGroup('Overall results')
-        if self.protocol.minimize_output.get():
-            form.addParam('showfinalscore', LabelParam,
-                          label="Table of ligand DARC scores",
-                          help="Table of DARC Scores\n\n"
-                               "TAG: \n"
-                               "DARC Score:.\n"
-                               "Total Energy: \n"
-                               "Interface Energy: .\n"
-                               "Interface HB: .\n"
-                               "Total packstats: .\n"
-                               "Interface_unsat: .\n"
-                               "ThetaLig: .\n")
-        else:
-            form.addParam('showfinalscore', LabelParam,
-                          label="Table of ligand DARC scores",
-                          help="Table of DARC Scores\n\n"
-                               "TAG: \n"
-                               "DARC Score:.")
-
         view = form.addGroup("Visualization in Chimerax")
         view.addParam('show_complex', LabelParam,
                       label="Visualize complex protein-ligand")
 
         view.addParam('complex_v', EnumParam,
-                      choices= self.COMPLEX,
+                      choices= self.complexNames,
                       default=0,
                       label="Choose a complex: ",
                       help="")
@@ -128,18 +83,18 @@ class DARCViewer(ProtocolViewer):
                       label="Visualize only ligand conformation")
 
         view.addParam('ligand_v', EnumParam,
-                      choices= self.LIGANDS,
+                      choices= self.ligandsNames,
                       default=0,
                       label="Choose a ligand: ",
                       help="")
 
         if self.protocol.minimize_output.get():
-            view_mini = form.addGroup("Visualizationof complexes after minimization")
+            view_mini = form.addGroup("Visualization of complexes after minimization")
             view_mini.addParam('show_complex_mini', LabelParam,
                           label="Visualize complex protein-ligand")
 
             view_mini.addParam('complex_v_mini', EnumParam,
-                          choices= self.COMPLEX_mini,
+                          choices= self.complexNames_mini,
                           default=0,
                           label="Choose a complex: ",
                           help="")
@@ -148,7 +103,7 @@ class DARCViewer(ProtocolViewer):
                           label="Visualize only ligand conformation")
 
             view_mini.addParam('ligand_v_mini', EnumParam,
-                          choices= self.LIGANDS_mini,
+                          choices= self.ligandsNames_mini,
                           default=0,
                           label="Choose a ligand: ",
                           help="")
@@ -160,48 +115,34 @@ class DARCViewer(ProtocolViewer):
             'ligand_v': self._visualizeLigand,
             'complex_v_mini': self._visualize_miniComplex,
             'ligand_v_mini': self._visualize_miniLigand,
-            'showfinalscore': self._visualizeFinalResults}
-
-
-    def _visualizeFinalResults(self, e=None):
-        """ Create a formatted table with the DARC results, sorted by DARC score"""
-        headerList = self.headerList
-        dataList = self.dataList
-
-        
-        if not dataList:
-            errorWindow(self.getTkRoot(), "Any data available")
-            return
-
-        TableView(headerList=headerList,
-                  dataList=dataList,
-                  title="DARC: Final Results Summary",
-                  mesg="DARC score for each protein-small molecule complex\n",
-                  height=len(dataList), width=250, padding=40)
+            'displayPymolSingle': self._viewSinglePymol,
+            'displayPymolMolecule': self._viewMoleculePymol,
+            'displayPymolPocket': self._viewPocketPymol,
+        }
 
 
     def _visualizeComplex(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
-        basename = self.COMPLEX[self.complex_v.get()]
-        path = os.path.abspath(os.path.join(self.protocol._getExtraPath(), "darc_complex", basename))
+        basename = self.complexNames[self.complex_v.get()]
+        path = os.path.abspath(self.complexDic[basename])
         self.displayChimera(file_path= path)
 
     def _visualizeLigand(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
-        basename = self.LIGANDS[self.ligand_v.get()]
-        path = os.path.abspath(os.path.join(self.protocol._getExtraPath(), "ligands", basename))
+        basename = self.ligandsNames[self.ligand_v.get()]
+        path = os.path.abspath(self.ligansDic[basename])
         self.displayChimera(file_path= path)
 
     def _visualize_miniComplex(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
-        basename = self.COMPLEX_mini[self.complex_v_mini.get()]
-        path = os.path.abspath(os.path.join(self.protocol._getExtraPath(), "minimization", "darc_complex", basename))
+        basename = self.complexNames_mini[self.complex_v_mini.get()]
+        path = os.path.abspath(self.complexDic_mini[basename])
         self.displayChimera(file_path= path)
 
     def _visualize_miniLigand(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
-        basename = self.LIGANDS_mini[self.ligand_v_mini.get()]
-        path = os.path.abspath(os.path.join(self.protocol._getExtraPath(), "minimization", "ligands", basename))
+        basename = self.ligandsNames_mini[self.ligand_v_mini.get()]
+        path = os.path.abspath(self.ligandsDic_mini[basename])
         self.displayChimera(file_path= path)
 
 
@@ -214,6 +155,22 @@ class DARCViewer(ProtocolViewer):
             errorWindow(self.getTkRoot(), "Any structure available")
             return
 
-        pwutils.runJob(None, Chimera.getProgram(), file_path, env=Chimera.getEnviron())
+        #pwutils.runJob(None, Chimera.getProgram(), file_path, env=Chimera.getEnviron())
+        subprocess.Popen([Chimera.getProgram(), file_path], env=Chimera.getEnviron())
 
-
+    def getFilesDic(self, pattern, subsPattern=None):
+        filesDic, names = {}, []
+        for pDir in self.protocol.getAllPocketDirs():
+            gridId = self.protocol.getGridId(pDir)
+            files = glob.glob(os.path.join(pDir, pattern))
+            #Substract files with the subspattern
+            if subsPattern != None:
+                subFiles = glob.glob(os.path.join(pDir, subsPattern))
+            else:
+                subFiles = []
+            for f in files:
+                if not f in subFiles:
+                    names.append('g{}_'.format(gridId) + os.path.basename(f))
+                    filesDic[names[-1]] = f
+        names.sort()
+        return filesDic, names

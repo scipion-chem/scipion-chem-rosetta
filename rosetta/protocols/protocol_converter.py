@@ -33,10 +33,7 @@ from pwem.objects.data import AtomStruct
 from pwem.protocols import EMProtocol
 
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
-
-from rosetta import Plugin
-
-
+from pwchem.utils import runOpenBabel
 
 
 def inputArg(fn):  # Input format file (fn)
@@ -133,7 +130,7 @@ class ConvertStructures(EMProtocol):
     def convertStep(self):
 
         if self.inputType==0:  # Small molecules
-            outputSmallMolecules = SetOfSmallMolecules().create(path=self._getPath(), suffix='SmallMols')
+            outputSmallMolecules = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix='SmallMols')
 
             error = []  # Save the file paths that could not be transformed
             for mol in self.inputSmallMols.get():
@@ -148,7 +145,7 @@ class ConvertStructures(EMProtocol):
                     fnOut, argout = outputArg(fnRoot, self.outputFormatSmall.get(), self)
                     args += argout
 
-                    Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getExtraPath()))
+                    runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getExtraPath()))
 
                     smallMolecule = SmallMolecule(smallMolFilename=fnOut)
                     outputSmallMolecules.append(smallMolecule)
@@ -160,7 +157,7 @@ class ConvertStructures(EMProtocol):
 
             if len(outputSmallMolecules) > 0:
                 print("The following entries could not be converted: %s" % error)
-                self._defineOutputs(outputSmallMols=outputSmallMolecules)
+                self._defineOutputs(outputSmallMolecules=outputSmallMolecules)
                 self._defineSourceRelation(self.inputSmallMols, outputSmallMolecules)
 
         else:
@@ -172,7 +169,7 @@ class ConvertStructures(EMProtocol):
 
             args += argout
 
-            Plugin.runOPENBABEL(self, args=args, cwd=os.path.abspath(self._getPath()))
+            runOpenBabel(protocol=self, args=args, cwd=os.path.abspath(self._getPath()))
 
             target = AtomStruct(filename=fnOut)
             self._defineOutputs(outputStructure=target)

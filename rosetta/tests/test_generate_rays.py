@@ -62,7 +62,7 @@ class TestImportBase(BaseTest):
     @classmethod
     def _prepareProtein(cls, target):
 
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'addH': True,
                 'waters': True,
                 'HETATM': True,
@@ -81,7 +81,7 @@ class TestImportBase(BaseTest):
     def _makegrid(cls, target):
         radius = 37
         spacing = 0.5
-        args = {'inputpdb': target,
+        args = {'inputAtomStruct': target,
                 'radius': radius,
                 'spacing': spacing
                 }
@@ -114,7 +114,7 @@ class TestRaysGeneration(TestImportBase):
         # Generate rays
         target_residue = 61
 
-        args = {'inputpdb': prep_target,
+        args = {'inputAtomStruct': prep_target,
                 'gpuList': 0,  # Not GPU
                 'target_residue': target_residue,
                 'cseed': True}
@@ -161,7 +161,7 @@ class TestRaysGeneration(TestImportBase):
         target_residue = 61
         additional_res = '57,56'
 
-        args = {'inputpdb': prep_target,
+        args = {'inputAtomStruct': prep_target,
                 'gpuList': 0,  # Not GPU
                 'target_residue': target_residue,
                 'multiple_origin': True,
