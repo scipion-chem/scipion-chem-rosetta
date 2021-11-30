@@ -110,15 +110,15 @@ class DARCViewer(DockingViewer):
 
 
     def _getVisualizeDict(self):
-        return {
+        viewDic = super()._getVisualizeDict()
+        darcDic = {
             'complex_v': self._visualizeComplex,
             'ligand_v': self._visualizeLigand,
             'complex_v_mini': self._visualize_miniComplex,
             'ligand_v_mini': self._visualize_miniLigand,
-            'displayPymolSingle': self._viewSinglePymol,
-            'displayPymolMolecule': self._viewMoleculePymol,
-            'displayPymolPocket': self._viewPocketPymol,
         }
+        viewDic.update(darcDic)
+        return viewDic
 
 
     def _visualizeComplex(self, e=None):
