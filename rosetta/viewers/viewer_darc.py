@@ -35,7 +35,7 @@ from pyworkflow.protocol.params import LabelParam, EnumParam
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
 from pwem.viewers import Chimera
 from pwchem.utils.utilsViewer import *
-from pwchem.viewers import DockingViewer
+from pwchem.viewers import SmallMoleculesViewer
 
 from rosetta.protocols.protocol_darc import RosettaProtDARC
 
@@ -50,7 +50,7 @@ def errorWindow(tkParent, msg):
         print(("Error:", msg))
 
 
-class DARCViewer(DockingViewer):
+class DARCViewer(SmallMoleculesViewer):
     """ Viewer for Rosetta program DARC
     """
     _label = 'Viewer DARC docking'
