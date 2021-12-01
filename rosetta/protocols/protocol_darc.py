@@ -443,6 +443,7 @@ class RosettaProtDARC(EMProtocol):
                           newMol.cleanObjId()
                           newMol.setGridId(gridId)
                           newMol.setMolClass('Rosetta')
+                          newMol.setDockId(self.getObjId())
                           newMol._energy = pwobj.Float(scoresDic[molBase])
 
                           newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
