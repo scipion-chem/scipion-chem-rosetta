@@ -192,9 +192,6 @@ class ProtRosettaGenerateStructures(EMProtocol):
         self._defineOutputs(outputAtomStructs=outputSet)
         self._defineSourceRelation(self.inputStructure, outputSet)
 
-        self._defineOutputs(exampleAtomStr=aStr)
-        print(ia)
-
 
     def _validate(self):
         errors = []
