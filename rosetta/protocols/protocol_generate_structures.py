@@ -81,11 +81,15 @@ class ProtRosettaGenerateStructures(EMProtocol):
                        help='Skip Rosetta idealize to the input atomic structure')
 
         group = form.addGroup('Symmetry')
-        group.addParam('asu', params.StringParam, label='ASU chains: ', default='A',
-                       help='Chains in the ASU (comma delimited, i.e. --asu=A,C,F)')
         group.addParam('sym', params.StringParam, label='Symmetry type: ', default='C1',
-                       help='Type of symmetry to use in the input')
+                       help='Type of symmetry to use in the input.\n'
+                            'Supported symmetries: C, D, T')
+        group.addParam('asu', params.StringParam, label='ASU chains: ',
+                       default='A', condition='sym!="C1"',
+                       help='Chains in the ASU (comma delimited, i.e. --asu=A,C,F)')
+
         group.addParam('symChains', params.StringParam, label='Symmetry chains: ',
+                       condition='sym!="C1"',
                        help='Symmetry-related chains, 2 chains for C sym, 3 for D sym '
                             '(comma delimted, i.e. --syms=A,B,D)')
 
@@ -129,7 +133,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
         if not self.skipIdealize.get():
             self.pdbfile = self.runRosettaIdealize()
 
-        if self.sym.get() != 'C1':
+        if self.isSymmetric():
             self.pdbfile, self.symfile = self.generateRosettaSym()
 
         # get number of residues in ASU
@@ -144,7 +148,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
       args = " -database {}/main/database".format(rosettaDir)
       args += " -in::file::s %s " % self.pdbfile
       args += " -parser::protocol {} ".format(xmlRosettaFile)
-      if self.sym.get() != 'C1':
+      if self.isSymmetric():
         args += " -parser::script_vars symmdef=%s " % self.symfile
         args += " -score_symm_complex false "
       if self.nucleic:
@@ -178,13 +182,18 @@ class ProtRosettaGenerateStructures(EMProtocol):
 
     def createOutputStep(self):
         outputSet = SetOfAtomStructs.create(self._getPath())
-        for file in os.listdir():
+        for file in os.listdir(self._getPath()):
             if '_rev2_' in file:
                 pdbFile = self._getPath(file)
-                outputSet.append(AtomStruct(filename=pdbFile))
+                aStr = AtomStruct(filename=pdbFile)
+                aStr.setVolume(self._getInputVolume())
+                outputSet.append(aStr)
 
         self._defineOutputs(outputAtomStructs=outputSet)
         self._defineSourceRelation(self.inputStructure, outputSet)
+
+        self._defineOutputs(exampleAtomStr=aStr)
+        print(ia)
 
 
     def _validate(self):
@@ -232,7 +241,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
         except:
             symChains = None
 
-        if sym != 'C1':
+        if self.isSymmetric():
           # number of asymmetric units
           try:
             # C symmetry
@@ -385,7 +394,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
 
         for line in generateStructuresXML.split('\n'):
           # for add symmetry to xml file
-          if self.sym.get() != 'C1':
+          if self.isSymmetric():
             if line.strip().startswith(tuple(symflags)):
               l = line.strip()[:-1]
               l += " symmetric='1'>"
@@ -448,3 +457,6 @@ class ProtRosettaGenerateStructures(EMProtocol):
             reslist.append(resid)
       f.close()
       return reslist
+
+    def isSymmetric(self):
+        return self.sym.get() != 'C1'
