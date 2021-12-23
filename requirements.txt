@@ -1,4 +1,3 @@
 scipion-pyworkflow
 scipion-em
 scipion-chem
-scipion-chem-autodock
