@@ -66,9 +66,13 @@ The steps to download the Rosetta files are the following ones:
         ./scons.py -j<NumOfJobs> mode=[debug/release*] extras=opencl [bin]
 
 
+2. **AutoDock dependency**
 
+The plugin scipion-chem-autodock is a requirement to run the DARC and make_ray_files programs.
+Therefore, even though it is not a compulsory requirement, it is highly recommended:
+(https://github.com/scipion-chem/scipion-chem-autodock)
 
-2. **Install the plugin in Scipion**
+3. **Install the plugin in Scipion**
 
 - **Install the stable version (Not available yet)**
 
