@@ -38,7 +38,8 @@ from pyworkflow.utils import Message
 from pyworkflow.protocol import params
 from pwem.protocols import EMProtocol
 from pwem.convert.atom_struct import toPdb
-from pwem.objects import SetOfAtomStructs, AtomStruct
+from pwem.objects import SetOfAtomStructs, AtomStruct, Volume
+from pwem.convert.headers import Ccp4Header
 
 from rosetta import Plugin
 from rosetta.constants import *
@@ -116,6 +117,16 @@ class ProtRosettaGenerateStructures(EMProtocol):
         self._insertFunctionStep('createOutputStep')
 
     def prepareInputStep(self):
+        #Set volume origin
+        vol = self._getInputVolume()
+        inVolName = vol.getFileName()
+        newFn = self._getExtraPath('correctedVol.mrc')
+        self.correctedVol = Volume(newFn)
+        self.correctedVol.copyInfo(vol)
+        origin = vol.getOrigin(force=True).getShifts()
+        sampling = vol.getSamplingRate()
+        Ccp4Header.fixFile(inVolName, newFn, origin, sampling, Ccp4Header.START)  # ORIGIN
+
         #Convert structure to pdb
         pdbFile = self.inputStructure.get().getFileName()
         name, ext = os.path.splitext(pdbFile)
@@ -186,7 +197,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
             if '_rev2_' in file:
                 pdbFile = self._getPath(file)
                 aStr = AtomStruct(filename=pdbFile)
-                aStr.setVolume(self._getInputVolume())
+                aStr.setVolume(self.correctedVol)
                 outputSet.append(aStr)
 
         self._defineOutputs(outputAtomStructs=outputSet)
@@ -416,7 +427,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
           if line.strip().endswith("(REPLACE WITH EWEIGHT)"):
             line = "\t\t\t<Reweight scoretype='elec_dens_fast' weight='%i'/>\n" % eweight
           elif line.strip().startswith("<LoadDensityMap"):
-            mapFile = os.path.abspath(self._getInputVolume().getFileName())
+            mapFile = os.path.abspath(self.correctedVol.getFileName())
             line = "\t\t<LoadDensityMap name='loaddens' mapfile=\"%s\"/>\n" % mapFile
           elif line.strip().endswith("MEMBRANE PROTEIN") and not self.membrane.get():
             continue
