@@ -29,6 +29,8 @@
 This protocol uses a Rosetta suite program (rosetta_scripts) to generate a set of possible atomic structures which fit
 an electronic density map.
 
+Adaptation of shared code from Gabriel Lander
+
 The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 """
 
@@ -86,12 +88,16 @@ class ProtRosettaGenerateStructures(EMProtocol):
                             'Supported symmetries: C, D, T')
         group.addParam('asu', params.StringParam, label='ASU chains: ',
                        default='A', condition='sym!="C1"',
-                       help='Chains in the ASU (comma delimited, i.e. --asu=A,C,F)')
+                       help='Chains in the ASU (comma delimited, i.e. A,C,F)')
 
-        group.addParam('symChains', params.StringParam, label='Symmetry chains: ',
+        group.addParam('symChains', params.StringParam, label='Symmetric chains: ',
                        condition='sym!="C1"',
-                       help='Symmetry-related chains, 2 chains for C sym, 3 for D sym '
-                            '(comma delimted, i.e. --syms=A,B,D)')
+                       help='Symmetry-related chains, 2 chains for C sym, 3 for D sym\n'
+                            'Comma-separated instance of symmetric chains in the complex\n'
+                            'i.e. C2 where ASU is chain A and B; symmetric are C and D respectively (hemoglobin):\n'
+                            'ASU chains: A,B\nSymmetric chains: A,C (or B,D)\n\n'
+                            'i.e. C3 where ASU is chain A and B; symmetric are C,D and E,F respectively:\n'
+                            'ASU chains: A,B\nSymmetric chains: A,C,D (or B,E,F)\n\n')
 
         group = form.addGroup('Other parameters')
         group.addParam('hydrogen', params.BooleanParam, label='Include hydrogens: ',
@@ -211,13 +217,8 @@ class ProtRosettaGenerateStructures(EMProtocol):
         outpdb = open(outf, 'w')
 
         chainids = []
-        unique = []
         # get rid of anything that is not ATOM, and get rid of hydrogens
         for line in open(pdbfile):
-          if line.startswith("COMPND") and line[11:16] == 'CHAIN':
-            cs = (line[17:].split(','))
-            css = [c.strip().strip(';') for c in cs]
-            unique.append(css)
           if line.startswith("ATOM"):
             if hydrogen is not True and line[76:78].strip() == "H": continue
             if line[17:20].strip() in ['A', 'U', 'C', 'G', 'DA', 'DT', 'DG', 'DC']:
@@ -233,10 +234,6 @@ class ProtRosettaGenerateStructures(EMProtocol):
         # check symmetry
         sym = self.sym.get().upper()
         asu = self.asu.get().split(',')
-        try:
-            symChains = self.symChains.get().split(',')
-        except:
-            symChains = None
 
         if self.isSymmetric():
           # number of asymmetric units
@@ -255,30 +252,9 @@ class ProtRosettaGenerateStructures(EMProtocol):
               exit("\nsymmetry=%s not handled by script\n" % sym)
 
           print("number of symmetry-related ASUs (sym=%s): %i" % (sym, num))
-          print("number of subunits in ASU: %i" % len(unique))
           print("number of chains: %i" % len(chainids))
 
-          if len(unique) != len(asu):
-            exit("\nError: number of chains in ASU (%i:%s) differs from the number specified (%i)\n" % (
-            len(unique), unique, len(asu)))
-
-          if len(chainids) % len(unique) != 0 or len(chainids) % num != 0 or num * len(unique) != len(chainids):
-            exit("\nError: number of chains not compatible with symmetry\n")
-
-          # get list of symmetry-related chains
-          keep = []
-          for set in unique:
-            keep.append(set[0])
-            keep.append(set[1])
-            if sym[0] == 'D':
-              keep.append(set[-1])
-
-          self.symchains = keep
-          # override symmetry-related chains if specified:
-          if symChains is not None:
-            if len(symChains) != len(keep) / len(unique):
-              exit("\nError: %i symmetry-related chains must be specified\n" % (len(keep)))
-            self.symchains = symChains
+          self.symchains = self.symChains.get().split(',')
 
           # create symmetry file for Rosetta
           if len(asu) == 1:
@@ -331,12 +307,13 @@ class ProtRosettaGenerateStructures(EMProtocol):
 
       symfile = os.path.abspath(self._getExtraPath(sym.lower() + ".symm"))
 
+      print('SymChains: ', self.symchains)
       cmd = "{}/main/source/src/apps/public/symmetry/make_symmdef_file.pl".format(Plugin.getRosettaDir())
       args = " -m NCS"
-      args += " -a %s" % (self.symchains[0])
-      args += " -i %s" % (self.symchains[1])
+      args += " -a %s" % (self.symchains[0][0])
+      args += " -i %s" % (self.symchains[1][0])
       # if D sym also add C chain for symmetry
-      if params['sym'][0] == 'D':
+      if sym.upper()[0] == 'D':
         args += " %s" % (self.symchains[-1])
       args += " -p %s" % self.pdbfile
       args += " -r 1000"
@@ -352,7 +329,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
       if not os.path.isfile(symfile) or not os.path.isfile(pdbfile):
         exit("\nError: Rosetta symmetry file not generated\n")
 
-      symedit = sym.lower() + "_edit.symm"
+      symedit = os.path.abspath(self._getExtraPath(sym.lower() + "_edit.symm"))
       fout = open(symedit, 'w')
 
       for line in open(symfile):
@@ -398,7 +375,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
               line = "\t\t%s\n" % l
 
             elif line.strip().startswith("<SetupForDensityScoring"):
-              line = "\t\t<SetupForSymmetry name='setupsymm' definition=\"%s\"/>\n" % self.symfile
+              line = '\t\t<SetupForSymmetry name="setupsymm" definition=\"%s\"/>\n' % self.symfile
 
             elif line.strip().startswith("<SwitchResidueTypeSetMover"):
               continue
@@ -407,7 +384,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
               l = "<SymMinMover name='cenmin' scorefxn='cen' type='lbfgs_armijo_nonmonotone' max_iter='200' tolerance='0.00001' bb='1' chi='1' jump='ALL'/>"
               line = "\t\t%s\n" % l
 
-            elif line.strip().startswith("<Add mover=setupdens"):
+            elif line.strip().startswith('<Add mover="setupdens"'):
               line = "\t\t<Add mover='setupsymm'/>\n"
 
           # if more than 1000 residues in ASU, use localrelax instead of fastrelax
