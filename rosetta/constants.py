@@ -76,10 +76,10 @@ generateStructuresXML = '''<ROSETTASCRIPTS>
 		<SwitchResidueTypeSetMover name="tocen" set="centroid"/>
 		<MinMover name="cenmin" scorefxn="cen" type="lbfgs_armijo_nonmonotone" max_iter="200" tolerance="0.00001" bb="1" chi="1" jump="ALL"/>
 		#This section will use Z-scores to determing poorly fit areas for rebuilding with increasingly more strict cutoffs
-		<CartesianSampler name="cen5_50" automode_scorecut="-0.5" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="2.0" ncycles="1" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
-		<CartesianSampler name="cen5_60" automode_scorecut="-0.3" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.5" ncycles="1" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
-		<CartesianSampler name="cen5_70" automode_scorecut="-0.1" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.5" ncycles="1" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
-		<CartesianSampler name="cen5_80" automode_scorecut="0.0" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.0" ncycles="1" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
+		<CartesianSampler name="cen5_50" automode_scorecut="-0.5" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="2.0" ncycles="200" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
+		<CartesianSampler name="cen5_60" automode_scorecut="-0.3" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.5" ncycles="200" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
+		<CartesianSampler name="cen5_70" automode_scorecut="-0.1" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.5" ncycles="200" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
+		<CartesianSampler name="cen5_80" automode_scorecut="0.0" scorefxn="cen" mcscorefxn="cen" fascorefxn="dens_soft" strategy="auto" fragbias="density" rms="1.0" ncycles="200" fullatom="0" bbmove="1" nminsteps="25" temp="4"/>
 		<FastRelax name="relaxcart" scorefxn="dens" repeats="1" cartesian="1"/>
 	</MOVERS>
 	<PROTOCOLS>
