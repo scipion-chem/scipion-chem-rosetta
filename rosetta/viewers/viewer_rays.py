@@ -29,7 +29,7 @@
 import os
 
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, Viewer
-from pwem.viewers.viewer_chimera import (Chimera)
+from pwem.viewers.viewer_chimera import ChimeraView, Chimera
 
 from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile
 
@@ -73,6 +73,5 @@ class RaysViewer(Viewer):
         f.write("open %s\n" % pdb)
         f.write("show surfaces\n")
 
-        # run in the background
-        Chimera.runProgram(Chimera.getProgram(), os.path.abspath(fnCmd) + " &")
-        return []
+        view = ChimeraView(fnCmd)
+        return [view]

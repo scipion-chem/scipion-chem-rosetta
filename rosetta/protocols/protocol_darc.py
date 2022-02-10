@@ -43,6 +43,7 @@ from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
 from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calculate_centerMass
+from pwchem import Plugin as pwchem_plugin
 
 #Soft importing autodock for electrostatic grid generation
 try:
@@ -442,6 +443,7 @@ class RosettaProtDARC(EMProtocol):
                           newMol.cleanObjId()
                           newMol.setGridId(gridId)
                           newMol.setMolClass('Rosetta')
+                          newMol.setDockId(self.getObjId())
                           newMol._energy = pwobj.Float(scoresDic[molBase])
 
                           newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
@@ -646,7 +648,7 @@ class RosettaProtDARC(EMProtocol):
           pdbqtFile = os.path.abspath(self._getTmpPath('{}.pdbqt'.format(self.getReceptorName())))
           if not os.path.exists(pdbqtFile):
               args = ' -v -r %s -o %s' % (strFile, pdbqtFile)
-              self.runJob(autodock_plugin.getMGLPath('bin/pythonsh'),
+              self.runJob(pwchem_plugin.getMGLPath('bin/pythonsh'),
                           autodock_plugin.getADTPath('Utilities24/prepare_receptor4.py') + args)
       else:
           pdbqtFile = strFile

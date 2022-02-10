@@ -26,16 +26,15 @@
 # **************************************************************************
 
 
-import os, subprocess
 import glob
 
 from tkinter import messagebox
 
 from pyworkflow.protocol.params import LabelParam, EnumParam
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
-from pwem.viewers import Chimera
+from pwem.viewers import ChimeraView
 from pwchem.utils.utilsViewer import *
-from pwchem.viewers import DockingViewer
+from pwchem.viewers import SmallMoleculesViewer
 
 from rosetta.protocols.protocol_darc import RosettaProtDARC
 
@@ -50,7 +49,7 @@ def errorWindow(tkParent, msg):
         print(("Error:", msg))
 
 
-class DARCViewer(DockingViewer):
+class DARCViewer(SmallMoleculesViewer):
     """ Viewer for Rosetta program DARC
     """
     _label = 'Viewer DARC docking'
@@ -110,40 +109,40 @@ class DARCViewer(DockingViewer):
 
 
     def _getVisualizeDict(self):
-        return {
+        viewDic = super()._getVisualizeDict()
+        darcDic = {
             'complex_v': self._visualizeComplex,
             'ligand_v': self._visualizeLigand,
             'complex_v_mini': self._visualize_miniComplex,
             'ligand_v_mini': self._visualize_miniLigand,
-            'displayPymolSingle': self._viewSinglePymol,
-            'displayPymolMolecule': self._viewMoleculePymol,
-            'displayPymolPocket': self._viewPocketPymol,
         }
+        viewDic.update(darcDic)
+        return viewDic
 
 
     def _visualizeComplex(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
         basename = self.complexNames[self.complex_v.get()]
         path = os.path.abspath(self.complexDic[basename])
-        self.displayChimera(file_path= path)
+        return self.displayChimera(file_path= path)
 
     def _visualizeLigand(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
         basename = self.ligandsNames[self.ligand_v.get()]
         path = os.path.abspath(self.ligansDic[basename])
-        self.displayChimera(file_path= path)
+        return self.displayChimera(file_path= path)
 
     def _visualize_miniComplex(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
         basename = self.complexNames_mini[self.complex_v_mini.get()]
         path = os.path.abspath(self.complexDic_mini[basename])
-        self.displayChimera(file_path= path)
+        return self.displayChimera(file_path= path)
 
     def _visualize_miniLigand(self, e=None):
         """Visualize a complex protein-small molecule in Chimera"""
         basename = self.ligandsNames_mini[self.ligand_v_mini.get()]
         path = os.path.abspath(self.ligandsDic_mini[basename])
-        self.displayChimera(file_path= path)
+        return self.displayChimera(file_path= path)
 
 
 
@@ -155,8 +154,8 @@ class DARCViewer(DockingViewer):
             errorWindow(self.getTkRoot(), "Any structure available")
             return
 
-        #pwutils.runJob(None, Chimera.getProgram(), file_path, env=Chimera.getEnviron())
-        subprocess.Popen([Chimera.getProgram(), file_path], env=Chimera.getEnviron())
+        view = ChimeraView(file_path)
+        return [view]
 
     def getFilesDic(self, pattern, subsPattern=None):
         filesDic, names = {}, []

@@ -35,7 +35,10 @@ from pwem.protocols.protocol_import import ProtImportPdb
 
 from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation as Prepare
 from rosetta.protocols.protocol_generate_rays import Rosetta_make_rayFile as makeRay
-from autodock.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
+try:
+    from autodock.protocols.protocol_generate_grid import Autodock_GridGeneration as makeGrid
+except:
+    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
 
 
 

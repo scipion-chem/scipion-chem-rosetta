@@ -25,11 +25,13 @@
 # *
 # **************************************************************************
 
-
+import math
 import pyworkflow.object as pwobj
 import pwem.objects.data as data
-from autodock.objects import GridADT
-import math
+try:
+    from autodock.objects import GridADT
+except:
+    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
 
 class RosettaRaysProtein(data.EMFile):
     """ Represent a RAY file """
