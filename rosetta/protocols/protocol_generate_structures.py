@@ -42,6 +42,9 @@ from pwem.protocols import EMProtocol
 from pwem.convert.atom_struct import toPdb
 from pwem.objects import SetOfAtomStructs, AtomStruct
 
+from pwem.emlib.image import ImageHandler
+from pwem.convert import Ccp4Header
+
 from rosetta import Plugin
 from rosetta.constants import *
 
@@ -122,6 +125,13 @@ class ProtRosettaGenerateStructures(EMProtocol):
         self._insertFunctionStep('createOutputStep')
 
     def prepareInputStep(self):
+        #Fix volume
+        inVol = self._getInputVolume()
+        mrcFile = self._getExtraPath('inpVolume.mrc')
+        ImageHandler().convert(inVol, mrcFile)
+        Ccp4Header.fixFile(mrcFile, mrcFile, inVol.getOrigin(force=True).getShifts(),
+                           inVol.getSamplingRate(), Ccp4Header.START)
+
         #Convert structure to pdb
         pdbFile = self.inputStructure.get().getFileName()
         name, ext = os.path.splitext(pdbFile)
@@ -192,7 +202,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
             if '_rev2_' in file:
                 pdbFile = self._getPath(file)
                 aStr = AtomStruct(filename=pdbFile)
-                aStr.setVolume(self._getInputVolume())
+                aStr.setVolume(self._getExtraPath('inpVolume.mrc'))
                 outputSet.append(aStr)
 
         self._defineOutputs(outputAtomStructs=outputSet)
@@ -393,7 +403,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
           if line.strip().endswith("(REPLACE WITH EWEIGHT)"):
             line = "\t\t\t<Reweight scoretype='elec_dens_fast' weight='%i'/>\n" % eweight
           elif line.strip().startswith("<LoadDensityMap"):
-            mapFile = os.path.abspath(self._getInputVolume().getFileName())
+            mapFile = os.path.abspath(self._getExtraPath('inpVolume.mrc'))
             line = "\t\t<LoadDensityMap name='loaddens' mapfile=\"%s\"/>\n" % mapFile
           elif line.strip().endswith("MEMBRANE PROTEIN") and not self.membrane.get():
             continue
