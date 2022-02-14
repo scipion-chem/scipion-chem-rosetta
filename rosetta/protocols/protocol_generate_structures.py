@@ -202,7 +202,10 @@ class ProtRosettaGenerateStructures(EMProtocol):
             if '_rev2_' in file:
                 pdbFile = self._getPath(file)
                 aStr = AtomStruct(filename=pdbFile)
-                aStr.setVolume(self._getExtraPath('inpVolume.mrc'))
+                outVol = self._getInputVolume()
+                outVol.setLocation(os.path.abspath(self._getExtraPath('inpVolume.mrc')))
+                outVol.setSamplingRate(1.0)
+                aStr.setVolume(outVol)
                 outputSet.append(aStr)
 
         self._defineOutputs(outputAtomStructs=outputSet)
