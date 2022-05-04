@@ -555,7 +555,7 @@ class RosettaProtDARC(EMProtocol):
       if pocket is None:
           return self._getExtraPath('pocket_1')
       for lDir in os.listdir(self._getExtraPath()):
-          if lDir.startswith('pocket_{}'.format(pocket.getObjId())):
+          if lDir == 'pocket_{}'.format(pocket.getObjId()):
               return self._getExtraPath(lDir)
 
 
