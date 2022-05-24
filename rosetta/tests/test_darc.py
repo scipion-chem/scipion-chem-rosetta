@@ -126,7 +126,7 @@ class TestImportBase(BaseTest):
         RosettaProteinPreparation,
         inputAtomStruct=cls.protImportPDB.outputPdb,
         rchains=True,
-        chain_name='{"Chain": "C", "Number of residues": 93, "Number of chains": 3}')
+        chain_name='{"model": 0, "chain": "C", "residues": 93}')
 
       cls.proj.launchProtocol(cls.protPrepareReceptor, wait=False)
 

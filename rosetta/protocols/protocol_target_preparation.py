@@ -231,7 +231,7 @@ class RosettaProteinPreparation(EMProtocol):
             errors.append("and set ROSETTA_HOME variables properly.")
             if program is not None:
                 errors.append("Current values:")
-                errors.append("ROSETTA_HOME = %s" % Plugin.getVar(ROSETTA_HOME))
+                errors.append("ROSETTA_HOME = %s" % Plugin.getVar('ROSETTA_HOME'))
                 errors.append("SCORE = %s" % SCORE)
 
 

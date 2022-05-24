@@ -25,12 +25,6 @@
 # *
 # **************************************************************************
 
-
-ROSETTA_HOME = 'ROSETTA_HOME' #Acceso by Plugin.getHome()
-
-# Supported Versions
-V3_12 = 'V3_12'
-
 # Path to the binaries inside the ROSETTA folder
 ROSETTA_BINARIES_PATH = "main/source/bin"
 ROSETTA_DATABASE_PATH = "main/database"
