@@ -43,6 +43,7 @@ from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calculate_centerMass
 from pwchem import Plugin as pwchem_plugin
+from pwchem.constants import MGL_DIC
 
 #Soft importing autodock for electrostatic grid generation
 try:
@@ -647,7 +648,7 @@ class RosettaProtDARC(EMProtocol):
           pdbqtFile = os.path.abspath(self._getTmpPath('{}.pdbqt'.format(self.getReceptorName())))
           if not os.path.exists(pdbqtFile):
               args = ' -v -r %s -o %s' % (strFile, pdbqtFile)
-              self.runJob(pwchem_plugin.getMGLPath('bin/pythonsh'),
+              self.runJob(pwchem_plugin.getProgramHome(MGL_DIC, 'bin/pythonsh'),
                           autodock_plugin.getADTPath('Utilities24/prepare_receptor4.py') + args)
       else:
           pdbqtFile = strFile
