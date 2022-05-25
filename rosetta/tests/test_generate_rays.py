@@ -47,14 +47,13 @@ class TestImportBase(BaseTest):
     @classmethod
     def setUpClass(cls):
         setupTestProject(cls)
-        path_test = Path(__file__).parent
-        cls.path_data = os.path.join(path_test, "data")
+        cls.ds = DataSet.getDataSet('model_building_tutorial')
+        cls.path_data = cls.ds.getFile('PDBx_mmCIF')
 
     @classmethod
-    def _importPDB(cls, path):
-        inputPdbData = 1  # file
-        args = {'inputPdbData': inputPdbData,
-                'pdbFile': path
+    def _importPDB(cls):
+        args = {'inputPdbData': 0,
+                'pdbId': '4erf'
                 }
 
         protocol = cls.newProtocol(ProtImportPdb, **args)
@@ -70,7 +69,7 @@ class TestImportBase(BaseTest):
                 'waters': True,
                 'HETATM': True,
                 "rchains": True,
-                "chain_name": '{"Chain": "A", "Number of residues": 92, "Number of chains": 3}',
+                "chain_name": '{"model": 0, "chain": "A", "residues": 92}',
                 "cseed": True
                 }
 
@@ -108,10 +107,8 @@ class TestRaysGeneration(TestImportBase):
         """
         print("\n Generate the rays with 1 target residue and without grid \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-
         # Import PDB as Scipion object and prepare it
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
         prep_target = self._prepareProtein(target)
 
         # Generate rays
@@ -152,10 +149,8 @@ class TestRaysGeneration(TestImportBase):
         """
         print("\n Generate the rays with 2 target residues and with electrostatic grid \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-
         # Import PDB as Scipion object and prepare it
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
         prep_target = self._prepareProtein(target)
 
         grid = self._makegrid(prep_target)
