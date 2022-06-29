@@ -144,7 +144,7 @@ class RosettaProtDARC(EMProtocol):
                       label="Use pockets to guide the docking",
                       default=True, important=True,
                       help="Whether to center the docking with pockets or with a residue  id")
-        group.addParam('inputPockets', params.PointerParam, pointerClass="SetOfPockets",
+        group.addParam('inputPockets', params.PointerParam, pointerClass="SetOfStructROIs",
                        label='Input pockets:', condition='fromPockets',
                        help="The protein pockets to dock in")
         group.addParam('mergeOutput', params.BooleanParam, default=True, expertLevel=LEVEL_ADVANCED,
