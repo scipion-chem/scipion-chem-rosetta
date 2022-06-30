@@ -144,7 +144,7 @@ class RosettaProtDARC(EMProtocol):
                       label="Use pockets to guide the docking",
                       default=True, important=True,
                       help="Whether to center the docking with pockets or with a residue  id")
-        group.addParam('inputPockets', params.PointerParam, pointerClass="SetOfStructROIs",
+        group.addParam('inputStructROIs', params.PointerParam, pointerClass="SetOfStructROIs",
                        label='Input pockets:', condition='fromPockets',
                        help="The protein pockets to dock in")
         group.addParam('mergeOutput', params.BooleanParam, default=True, expertLevel=LEVEL_ADVANCED,
@@ -243,7 +243,7 @@ class RosettaProtDARC(EMProtocol):
         cId = self._insertFunctionStep('convertInputStep', prerequisites=[])
         raysSteps = []
         if self.fromPockets:
-            for pocket in self.inputPockets.get():
+            for pocket in self.inputStructROIs.get():
                 gId = self._insertFunctionStep('generateRaysStep', pocket.clone(), prerequisites=[cId])
                 raysSteps.append(gId)
         else:
@@ -255,7 +255,7 @@ class RosettaProtDARC(EMProtocol):
         for mol in self.inputLigands.get():
             if not mol.getMolBase() in usedBases:
                 if self.fromPockets:
-                    for pocket in self.inputPockets.get():
+                    for pocket in self.inputStructROIs.get():
                         dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
                         darcSteps.append(dId)
                 else:
@@ -536,7 +536,7 @@ class RosettaProtDARC(EMProtocol):
             if not self.fromPockets:
                 pdb_file = self.inputAtomStruct.get().getFileName()
             else:
-                pdb_file = self.inputPockets.get().getProteinFile()
+                pdb_file = self.inputStructROIs.get().getProteinFile()
         else:
             pdb_file = self.originalReceptorFile
         return pdb_file

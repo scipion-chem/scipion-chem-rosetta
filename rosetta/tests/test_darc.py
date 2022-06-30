@@ -209,8 +209,8 @@ class TestImportBase(BaseTest):
                 mergeOutput=True,
                 numberOfThreads=8)
 
-            protDARC.inputPockets.set(self.protFilter)
-            protDARC.inputPockets.setExtended('outputStructROIs')
+            protDARC.inputStructROIs.set(self.protFilter)
+            protDARC.inputStructROIs.setExtended('outputStructROIs')
             protDARC.inputLigands.set(protLigs)
             protDARC.inputLigands.setExtended('outputSmallMolecules')
 
