@@ -33,10 +33,15 @@ information such as name and number of residues.
 """
 
 # Imports
-from pwchem.wizards import SelectChainWizard
+from pwchem.wizards import *
 from rosetta.protocols.protocol_target_preparation import RosettaProteinPreparation
 
 SelectChainWizard().addTarget(protocol=RosettaProteinPreparation,
                               targets=['chain_name'],
                               inputs=['inputAtomStruct'],
                               outputs=['chain_name'])
+
+SelectMultiChainWizard().addTarget(protocol=RosettaProteinPreparation,
+                                   targets=['chain_name'],
+                                   inputs=['inputAtomStruct'],
+                                   outputs=['chain_name'])
