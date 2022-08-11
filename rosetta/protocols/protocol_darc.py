@@ -34,7 +34,6 @@ at the interface.
 The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
 """
 
-
 from pyworkflow.utils import Message, createLink
 from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
@@ -44,6 +43,7 @@ from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calculate_centerMass
 from pwchem import Plugin as pwchem_plugin
+from pwchem.constants import MGL_DIC
 
 #Soft importing autodock for electrostatic grid generation
 try:
@@ -144,10 +144,10 @@ class RosettaProtDARC(EMProtocol):
                       label="Use pockets to guide the docking",
                       default=True, important=True,
                       help="Whether to center the docking with pockets or with a residue  id")
-        group.addParam('inputPockets', params.PointerParam, pointerClass="SetOfPockets",
+        group.addParam('inputStructROIs', params.PointerParam, pointerClass="SetOfStructROIs",
                        label='Input pockets:', condition='fromPockets',
                        help="The protein pockets to dock in")
-        group.addParam('mergeOutput', params.BooleanParam, default=False, expertLevel=LEVEL_ADVANCED,
+        group.addParam('mergeOutput', params.BooleanParam, default=True, expertLevel=LEVEL_ADVANCED,
                        label='Merge outputs from pockets:', condition='fromPockets',
                        help="Merge the outputs from the different pockets")
         group = self._defineParamsRays(group)
@@ -243,7 +243,7 @@ class RosettaProtDARC(EMProtocol):
         cId = self._insertFunctionStep('convertInputStep', prerequisites=[])
         raysSteps = []
         if self.fromPockets:
-            for pocket in self.inputPockets.get():
+            for pocket in self.inputStructROIs.get():
                 gId = self._insertFunctionStep('generateRaysStep', pocket.clone(), prerequisites=[cId])
                 raysSteps.append(gId)
         else:
@@ -255,7 +255,7 @@ class RosettaProtDARC(EMProtocol):
         for mol in self.inputLigands.get():
             if not mol.getMolBase() in usedBases:
                 if self.fromPockets:
-                    for pocket in self.inputPockets.get():
+                    for pocket in self.inputStructROIs.get():
                         dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
                         darcSteps.append(dId)
                 else:
@@ -361,7 +361,7 @@ class RosettaProtDARC(EMProtocol):
 
         paramsDir = self.getParamsDir(ligand)
         # Add ligand file
-        ligand_pdb = glob.glob(os.path.join(paramsDir, "*.pdb"))[0]
+        ligand_pdb = self.getRosettaConfFile(paramsDir, ligand)
         newLigandPDB = self.changeParamFileCode(ligand_pdb, ligand)
         args += " -ligand %s" % os.path.abspath(newLigandPDB)
 
@@ -536,7 +536,7 @@ class RosettaProtDARC(EMProtocol):
             if not self.fromPockets:
                 pdb_file = self.inputAtomStruct.get().getFileName()
             else:
-                pdb_file = self.inputPockets.get().getProteinFile()
+                pdb_file = self.inputStructROIs.get().getProteinFile()
         else:
             pdb_file = self.originalReceptorFile
         return pdb_file
@@ -556,7 +556,7 @@ class RosettaProtDARC(EMProtocol):
       if pocket is None:
           return self._getExtraPath('pocket_1')
       for lDir in os.listdir(self._getExtraPath()):
-          if lDir.startswith('pocket_{}'.format(pocket.getObjId())):
+          if lDir == 'pocket_{}'.format(pocket.getObjId()):
               return self._getExtraPath(lDir)
 
 
@@ -648,7 +648,7 @@ class RosettaProtDARC(EMProtocol):
           pdbqtFile = os.path.abspath(self._getTmpPath('{}.pdbqt'.format(self.getReceptorName())))
           if not os.path.exists(pdbqtFile):
               args = ' -v -r %s -o %s' % (strFile, pdbqtFile)
-              self.runJob(pwchem_plugin.getMGLPath('bin/pythonsh'),
+              self.runJob(pwchem_plugin.getProgramHome(MGL_DIC, 'bin/pythonsh'),
                           autodock_plugin.getADTPath('Utilities24/prepare_receptor4.py') + args)
       else:
           pdbqtFile = strFile
@@ -665,9 +665,12 @@ class RosettaProtDARC(EMProtocol):
                     code, score = line.split()[0], line.split()[1]
                 else:
                     code, score = line.split()[1], line.split()[2]
-                scoresDic[code.split('_')[-2]] = score
+                ligCode = code[len(self.getReceptorName())+1:]
+                ligCode = '_'.join(ligCode.split('_')[:-1])
+                scoresDic[ligCode] = score
         return scoresDic
 
-
-
-
+    def getRosettaConfFile(self, dir, ligand):
+        for file in os.listdir(dir):
+            if '.pdb' in file and not ligand.getMolBase() in file:
+                return os.path.join(dir, file)

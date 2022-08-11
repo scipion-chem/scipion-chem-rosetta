@@ -29,6 +29,7 @@ import pwem
 import os
 import fnmatch
 import pyworkflow.utils as pwutils
+from pwem import Config as emConfig
 
 from pyworkflow.utils import Environ
 from .constants import *
@@ -40,18 +41,19 @@ _logo = "rosetta_icon.png"
 _references = ['LeaverFay2011']
 
 
+ROSETTA_DIC = {'name': 'rosetta', 'version': '3.12', 'home': 'ROSETTA_HOME'}
 
 class Plugin(pwem.Plugin):
-    _homeVar = ROSETTA_HOME
-    _pathVars = [ROSETTA_HOME]
-    _supportedVersions = [V3_12]
+    _homeVar = ROSETTA_DIC['home']
+    _pathVars = [ROSETTA_DIC['home']]
+    _supportedVersions = [ROSETTA_DIC['version']]
 
 
     @classmethod
     def _defineVariables(cls):
         """ Return and write a variable in the config file. Set the Rosetta path on the computer
         """
-        cls._defineVar(ROSETTA_HOME, cls.getRosettaDir())
+        cls._defineVar(ROSETTA_DIC['home'], cls.getRosettaDir())
 
 
     @classmethod
@@ -73,7 +75,7 @@ class Plugin(pwem.Plugin):
     @classmethod
     def getProgram(cls, progName, path=ROSETTA_BINARIES_PATH):
         """ Return the program binary that will be used. """
-        return os.path.join(Plugin.getHome(),
+        return os.path.join(cls.getHome(),
                             path,
                             progName)
 
@@ -93,8 +95,9 @@ class Plugin(pwem.Plugin):
              the error messages will be returned.
              """
         missingPaths = []
-        if not os.path.exists(os.path.expanduser(Plugin.getVar(ROSETTA_HOME))):
-            missingPaths.append("Path of Rosetta does not exist (%s) : %s " % (ROSETTA_HOME, Plugin.getVar(ROSETTA_HOME)))
+        if not os.path.exists(os.path.expanduser(cls.getVar(ROSETTA_DIC['home']))):
+            missingPaths.append("Path of Rosetta does not exist (%s) : %s " % (ROSETTA_DIC['home'],
+                                                                               cls.getVar(ROSETTA_DIC['home'])))
         return missingPaths
 
 
@@ -112,7 +115,7 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def getRosettaDir(cls, fn=""):
-        fileList = Plugin.find("/home", "rosetta_bin_linux*")
+        fileList = cls.find(emConfig.EM_ROOT, "rosetta_bin_linux*")
         if len(fileList) == 0:
             return None
         else:

@@ -77,7 +77,7 @@ class TestImportBase(BaseTest):
           if pocketFinder == 'autoligand':
               cls._waitOutput(cls.protGridADT, 'outputGrid', sleepTime=5)
           pocketProt = cls._runPocketFinder()
-          cls._waitOutput(pocketProt, 'outputPockets', sleepTime=5)
+          cls._waitOutput(pocketProt, 'outputStructROIs', sleepTime=5)
           cls._runSetFilter(inProt=pocketProt, number=2, property='_score')
 
       cls._waitOutput(cls.protPrepareLigandADT, 'outputSmallMolecules', sleepTime=5)
@@ -126,7 +126,7 @@ class TestImportBase(BaseTest):
         RosettaProteinPreparation,
         inputAtomStruct=cls.protImportPDB.outputPdb,
         rchains=True,
-        chain_name='{"Chain": "C", "Number of residues": 93, "Number of chains": 3}')
+        chain_name='{"model": 0, "chain": "C", "residues": 93}')
 
       cls.proj.launchProtocol(cls.protPrepareReceptor, wait=False)
 
@@ -157,7 +157,7 @@ class TestImportBase(BaseTest):
         operation=ProtSetFilter.CHOICE_RANKED,
         threshold=number, rankingField=property)
       cls.protFilter.inputSet.set(inProt)
-      cls.protFilter.inputSet.setExtended('outputPockets')
+      cls.protFilter.inputSet.setExtended('outputStructROIs')
 
       cls.proj.launchProtocol(cls.protFilter, wait=False)
       return cls.protFilter
@@ -209,8 +209,8 @@ class TestImportBase(BaseTest):
                 mergeOutput=True,
                 numberOfThreads=8)
 
-            protDARC.inputPockets.set(self.protFilter)
-            protDARC.inputPockets.setExtended('outputPockets')
+            protDARC.inputStructROIs.set(self.protFilter)
+            protDARC.inputStructROIs.setExtended('outputStructROIs')
             protDARC.inputLigands.set(protLigs)
             protDARC.inputLigands.setExtended('outputSmallMolecules')
 
@@ -240,7 +240,7 @@ class TestDARC(TestImportBase):
         """
         print("\n Complete Docking from protein pockets and shape only \n")
         if pocketFinder!=None:
-            self._waitOutput(self.protFilter, 'outputPockets', sleepTime=5)
+            self._waitOutput(self.protFilter, 'outputStructROIs', sleepTime=5)
             protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.protFilter)
         else:
             print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'

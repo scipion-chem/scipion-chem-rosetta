@@ -43,13 +43,11 @@ class TestImportBase(BaseTest):
     def setUpClass(cls):
         setupTestProject(cls)
         path_test = Path(__file__).parent
-        cls.path_data = os.path.join(path_test, "data")
 
     @classmethod
-    def _importPDB(cls, path):
-        inputPdbData = 1  # file
-        args = {'inputPdbData': inputPdbData,
-                'pdbFile': path
+    def _importPDB(cls):
+        args = {'inputPdbData': 0,
+                'pdbId': '4erf'
                 }
 
         protocol = cls.newProtocol(ProtImportPdb, **args)
@@ -105,10 +103,8 @@ class TestTargetPreparation(TestImportBase):
         """
         print("\n Removing water from a protein structure \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-
         # Import PDB as Scipion object
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
 
         args = {'inputAtomStruct': target,
                 'addH': False,
@@ -124,7 +120,7 @@ class TestTargetPreparation(TestImportBase):
         pdb_out_path = os.path.abspath(pdb_out.getFileName())
 
         n_chains_0, n_residues_total_0, n_residues_chain_0, \
-        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(prot_path)
+        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(target.getFileName())
         n_chains, n_residues_total, n_residues_chain, \
         n_waters_total, n_waters, n_ligands, n_atoms = self._StructureInformation(pdb_out_path)
 
@@ -153,18 +149,15 @@ class TestTargetPreparation(TestImportBase):
         """
         print("\n Removing ligands and chains from a protein structure in cif format \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.cif"))
-
-
         # Import PDB as Scipion object
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
 
         args = {'inputAtomStruct': target,
                 'addH': False,
                 'waters': False,
                 'HETATM': True,
                 "rchains": True,
-                "chain_name": '{"Chain": "A", "Number of residues": 92, "Number of chains": 3}',
+                "chain_name": '{"model": 0, "chain": "A", "residues": 92}',
                 "cseed": True
                 }
 
@@ -175,7 +168,7 @@ class TestTargetPreparation(TestImportBase):
 
 
         n_chains_0, n_residues_total_0, n_residues_chain_0, \
-        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(prot_path)
+        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(target.getFileName())
         n_chains, n_residues_total, n_residues_chain, \
         n_waters_total, n_waters, n_ligands, n_atoms = self._StructureInformation(pdb_out_path)
 
@@ -207,11 +200,8 @@ class TestTargetPreparation(TestImportBase):
         """
         print("\n Adding Hydrogens in protein in a cif format \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.cif"))
-
-
         # Import PDB as Scipion object
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
 
         args = {'inputAtomStruct': target,
                 'addH': True,
@@ -228,7 +218,7 @@ class TestTargetPreparation(TestImportBase):
 
 
         n_chains_0, n_residues_total_0, n_residues_chain_0, \
-        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(prot_path)
+        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(target.getFileName())
         n_chains, n_residues_total, n_residues_chain, \
         n_waters_total, n_waters, n_ligands, n_atoms = self._StructureInformation(pdb_out_path)
 
@@ -263,18 +253,15 @@ class TestTargetPreparation(TestImportBase):
         """
         print("\n Add hydrogens and completed clean of protein \n")
 
-        prot_path = os.path.abspath(os.path.join(self.path_data, "4erf.pdb"))
-
-
         # Import PDB as Scipion object
-        target = self._importPDB(prot_path)
+        target = self._importPDB()
 
         args = {'inputAtomStruct': target,
                 'addH': True,
                 'waters': True,
                 'HETATM': True,
                 "rchains": True,
-                "chain_name": '{"Chain": "A", "Number of residues": 92, "Number of chains": 3}',
+                "chain_name": '{"model": 0, "chain": "A", "residues": 92}',
                 "cseed": True
                 }
 
@@ -285,7 +272,7 @@ class TestTargetPreparation(TestImportBase):
 
 
         n_chains_0, n_residues_total_0, n_residues_chain_0, \
-        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(prot_path)
+        n_waters_total_0, n_waters_0, n_ligands_0, n_atoms_0 = self._StructureInformation(target.getFileName())
         n_chains, n_residues_total, n_residues_chain, \
         n_waters_total, n_waters, n_ligands, n_atoms = self._StructureInformation(pdb_out_path)
 
