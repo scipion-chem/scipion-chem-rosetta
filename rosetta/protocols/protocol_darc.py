@@ -253,7 +253,7 @@ class RosettaProtDARC(EMProtocol):
         darcSteps = []
         usedBases = []
         for mol in self.inputLigands.get():
-            if not mol.getMolBase() in usedBases:
+            if not mol.getMolName() in usedBases:
                 if self.fromPockets:
                     for pocket in self.inputStructROIs.get():
                         dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
@@ -261,7 +261,7 @@ class RosettaProtDARC(EMProtocol):
                 else:
                     dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=raysSteps)
                     darcSteps.append(dId)
-                usedBases.append(mol.getMolBase())
+                usedBases.append(mol.getMolName())
 
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
@@ -434,13 +434,12 @@ class RosettaProtDARC(EMProtocol):
 
             pdbFiles = self.getLigandFiles(outDir)
             for mol in self.inputLigands.get():
-                molName, molBase = mol.getUniqueName(), mol.getMolBase()
+                molName, molBase = mol.getUniqueName(), mol.getMolName()
                 for pFile in pdbFiles:
                     if molBase in pFile and not molBase in savedMols:
                         if not self.minimize_output or 'mini_' in pFile:
                           newMol = SmallMolecule()
-                          newMol.copy(mol)
-                          newMol.cleanObjId()
+                          newMol.copy(mol, copyId=False)
                           newMol.setGridId(gridId)
                           newMol.setMolClass('Rosetta')
                           newMol.setDockId(self.getObjId())
@@ -449,6 +448,7 @@ class RosettaProtDARC(EMProtocol):
                           newPDBFile = self._getPath(newMol.getUniqueName() + '_1.pdb')
                           shutil.copy(os.path.join(outDir, pFile), newPDBFile)
                           newMol.poseFile.set(newPDBFile)
+                          newMol.setPoseId(1)
                           outputSet.append(newMol)
                           savedMols.append(molBase)
 
@@ -582,7 +582,7 @@ class RosettaProtDARC(EMProtocol):
 
     def getParamsDir(self, mol):
         for dir in os.listdir(self._getExtraPath('params')):
-            if mol.getMolBase() in dir:
+            if mol.getMolName() in dir:
                 return self._getExtraPath('params/{}'.format(dir))
 
     def changeParamFileCode(self, file, ligand):
@@ -594,7 +594,7 @@ class RosettaProtDARC(EMProtocol):
         ligandDir, ligandFn = os.path.split(file)
         ligandCode = ligandFn.split(sep)[0]
 
-        newLigandFile = os.path.join(ligandDir, ligandFn.replace(ligandCode, ligand.getMolBase()))
+        newLigandFile = os.path.join(ligandDir, ligandFn.replace(ligandCode, ligand.getMolName()))
         if file != newLigandFile:
             shutil.copy(file, newLigandFile)
         return newLigandFile
@@ -672,5 +672,5 @@ class RosettaProtDARC(EMProtocol):
 
     def getRosettaConfFile(self, dir, ligand):
         for file in os.listdir(dir):
-            if '.pdb' in file and not ligand.getMolBase() in file:
+            if '.pdb' in file and not ligand.getMolName() in file:
                 return os.path.join(dir, file)
