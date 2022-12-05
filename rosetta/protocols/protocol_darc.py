@@ -38,7 +38,7 @@ from pyworkflow.utils import Message, createLink
 from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
 import pyworkflow.object as pwobj
-from pyworkflow.protocol.params import (LEVEL_ADVANCED, GPU_LIST)
+from pyworkflow.protocol.params import LEVEL_ADVANCED, GPU_LIST, USE_GPU
 from pwem.protocols import EMProtocol
 from pwchem.objects import SetOfSmallMolecules, SmallMolecule
 from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calculate_centerMass
@@ -80,160 +80,114 @@ class RosettaProtDARC(EMProtocol):
         self.stepsExecutionMode = params.STEPS_PARALLEL
 
     # -------------------------- DEFINE param functions ----------------------
-    def _defineParamsRays(self, form):
-        form.addParam("inputAtomStruct", params.PointerParam, pointerClass="AtomStruct",
-                    label="Protein structure", condition='not fromPockets',
-                    important=True,
-                    allowsNull=False,
-                    help="Select the atomic structure of the prepared protein file")
+    def _defineParams(self, form):
+        """ Define the input parameters that will be used.
+        """
+        form.addHidden(USE_GPU, params.BooleanParam, default=True,
+                       label="Use GPU for execution: ",
+                       help="This protocol has both CPU and GPU implementation.\
+                                                 Select the one you want to use.")
 
-        form.addParam("target_residue", params.StringParam,
-                      label="Target residue",
-                      important=True,  condition='not fromPockets',
-                      allowsNull=False,
+        form.addHidden(GPU_LIST, params.StringParam, default='0', label="Choose GPU IDs",
+                       help="Add a list of GPU devices that can be used")
+
+        form.addSection(label=Message.LABEL_INPUT)
+        group = form.addGroup('Receptor specification')
+        group.addParam('fromReceptor', params.EnumParam, label='Dock on : ', default=1,
+                       choices=['Whole protein', 'SetOfStructROIs'],
+                       help='Whether to dock on a whole protein surface or on specific regions')
+
+        # Docking on whole protein
+        group.addParam('inputAtomStruct', params.PointerParam, pointerClass="AtomStruct",
+                       label='Input atomic structure: ', condition='fromReceptor == 0',
+                       help="The atom structure to use as receptor in the docking")
+
+        # Docking on pockets
+        group.addParam('inputStructROIs', params.PointerParam, pointerClass="SetOfStructROIs",
+                       label='Input pockets: ', condition='not fromReceptor == 0',
+                       help="The protein structural ROIs to dock in")
+
+        group.addParam("target_residue", params.StringParam,
+                      label="Target residue: ", condition='fromReceptor == 0',
                       help="Specify the number id of protein residue that you want to "
                            "use to generate the shape of pocket, around of that residue,"
                            " (preferably in the protein surface) using the rays method.")
 
-        form.addParam("multiple_target", params.BooleanParam,
-                      label='Multiple target residues',
-                      default=False, condition='not fromPockets',
-                      important=True,
+        group.addParam("multiple_target", params.BooleanParam,
+                      label='Multiple target residues', default=False, condition='fromReceptor == 0',
                       help='Use to define the bound site for the small molecules')
 
-        form.addParam('target_residues', params.StringParam, condition='multiple_target and not fromPockets',
+        group.addParam('target_residues', params.StringParam, condition='multiple_target and fromReceptor == 0',
                       label='Additional target residues',
                       help='Write the additional number of protein residues used to throw the rays and create'
                            'the docking surface. The numbers have to be separated by semicolon, comma or space.\n\n'
-                           'Examples: \n\n'
-                           '1- 99,61 \n\n'
-                           '2- 99;61 \n\n'
-                           '3- 99 61  \n\n')
+                           'Examples: \n\n1- 99,61 \n\n2- 99;61 \n\n3- 99 61  \n\n')
 
-        form.addParam("change_origin", params.BooleanParam,
-                      label='Change origin for ray generation',
-                      default=False, condition='not fromPockets',
-                      important=True,
+        group.addParam("change_origin", params.BooleanParam, expertLevel=LEVEL_ADVANCED,
+                      label='Change origin for ray generation', default=False, condition='fromReceptor == 0',
                       help='If you want change the default () origin of rays generation, select "yes"')
 
-        form.addParam("origin_residue", params.IntParam,
-                      label="Residue origin",
-                      important=True,
-                      condition='change_origin and not fromPockets',
-                      allowsNull=True,
+        group.addParam("origin_residue", params.IntParam, expertLevel=LEVEL_ADVANCED,
+                      label="Residue origin", condition='change_origin and fromReceptor == 0',
                       help="Specify the number id of protein residue that you want to"
                            " use as origin points for casting rays. This origin will be"
                            " the center of mass of that residue. ")
 
-        return form
-
-
-    def _defineParams(self, form):
-        """ Define the input parameters that will be used.
-        """
-        form.addSection(label=Message.LABEL_INPUT)
-        group = form.addGroup('Ligands')
-        group.addParam("inputLigands", params.PointerParam, pointerClass="SetOfSmallMolecules", #PDB of the ligands
-                      label="Ligands to dock",
-                      important=True,
-                      allowsNull=False,
-                      help="Select the ligand or ligand conformers for molecular docking")
-
-        group = form.addGroup('Receptor')
-        group.addParam('fromPockets', params.BooleanParam,
-                      label="Use pockets to guide the docking",
-                      default=True, important=True,
-                      help="Whether to center the docking with pockets or with a residue  id")
-        group.addParam('inputStructROIs', params.PointerParam, pointerClass="SetOfStructROIs",
-                       label='Input pockets:', condition='fromPockets',
-                       help="The protein pockets to dock in")
-        group.addParam('mergeOutput', params.BooleanParam, default=True, expertLevel=LEVEL_ADVANCED,
-                       label='Merge outputs from pockets:', condition='fromPockets',
-                       help="Merge the outputs from the different pockets")
-        group = self._defineParamsRays(group)
-
-        form.addSection('Docking')
         if ADTGrid:
-            form.addParam("shape_only", params.BooleanParam,
-                          label="Use only shape of protein and ligand",
-                          default=True,
-                          important=True,
-                          help="")
-            form.addParam("grid", params.PointerParam, pointerClass="GridADT",
-                          condition="not shape_only",
-                          label="Grid file", important=True, allowsNull=False,
-                          help="Select the grid file")
+            group.addParam("use_electro", params.BooleanParam, label="Include electrostatics: ", default=True,
+                           help="Whether to use electrostatics information from a AutoDock grid or use only the shape "
+                                "of the pocket")
+            group.addParam("grid", params.PointerParam, pointerClass="GridADT",
+                          condition="use_electro", label="Input grid: ",
+                          help="Select the AutoDock grid object")
 
         else:
-            self.shape_only = params.Boolean(True)
-        
-        form.addParam("search_conformers", params.BooleanParam,
-                      label="Search conformers on the fly",
-                      default=False,
-                      important=True,
-                      help="")
+            self.use_electro = params.Boolean(False)
 
-        form.addParam("minimize_output", params.BooleanParam,
-                      label="Minimize output complex",
-                      default=False,
-                      important=True,
-                      help="")
+        group = form.addGroup('Docking')
+        group.addParam('inputSmallMolecules', params.PointerParam, pointerClass="SetOfSmallMolecules",
+                       label='Input small molecules: ', allowsNull=False,
+                       help="Input small molecules to be docked with AutoDock")
+
+        group.addParam("search_conformers", params.BooleanParam,
+                      label="Search conformers on the fly", default=False,
+                      help="Whether to look for ligand conformers during the docking")
+
+        group.addParam("minimize_output", params.BooleanParam,
+                      label="Minimize output complex", default=False,
+                      help="Perform energy minimization on the output structure")
 
         # Advanced parameters =======================================
         advanced = form.addGroup("Advanced parameters", expertLevel=LEVEL_ADVANCED)
-        advanced.addParam('num_runs', params.IntParam,
-                          default=100,
-                          label='Runs for PSO:',
+        advanced.addParam('num_runs', params.IntParam, default=100, label='Runs for PSO:',
                           help='Set the number of runs used during Particle Swarm Optimization (PSO). '
-                               'Default value is 100 runs.',
-                          expertLevel=LEVEL_ADVANCED)
+                               'Default value is 100 runs.')
 
-        advanced.addParam('num_particles', params.IntParam,
-                          default=100,
-                          label='Particles for PSO:',
+        advanced.addParam('num_particles', params.IntParam, default=100, label='Particles for PSO:',
                           help='Set the number of particles used during Particle Swarm Optimization (PSO). '
-                               'Default value is 100 particles.',
-                          expertLevel=LEVEL_ADVANCED)
+                               'Default value is 100 particles.')
 
-        advanced.addParam('missing_weight', params.FloatParam,
-                          default=5.48,
+        advanced.addParam('missing_weight', params.FloatParam, default=5.48,
                           label='Weight for missing points in the pockets:',
                           help='Set the weight of those rays that do not reach the protein pocket'
-                               ' or the marked area around an atom or several in the ray generation step',
-                          expertLevel=LEVEL_ADVANCED)
+                               ' or the marked area around an atom or several in the ray generation step')
 
-        advanced.addParam('steric_weight', params.FloatParam,
-                          default=0.61,
+        advanced.addParam('steric_weight', params.FloatParam, default=0.61,
                           label='Weight for missing points in the ligand:',
-                          help='Set the weight of those rays that do not reach the small molecule',
-                          expertLevel=LEVEL_ADVANCED)
+                          help='Set the weight of those rays that do not reach the small molecule')
 
-        advanced.addParam('extra_weight', params.FloatParam,
-                          default=5.47,
+        advanced.addParam('extra_weight', params.FloatParam, default=5.47,
                           label='Weight for ligand out of pocket:',
-                          help='Set the weight of the small molecule when it is moving away from the pocket',
-                          expertLevel=LEVEL_ADVANCED)
+                          help='Set the weight of the small molecule when it is moving away from the pocket')
 
         runs = form.addGroup("Runs option",  expertLevel=LEVEL_ADVANCED)
-        runs.addParam("cseed", params.BooleanParam,
-                       label='Use Constant Seed',
-                       default=False,
+        runs.addParam("cseed", params.BooleanParam, label='Use Constant Seed: ', default=False,
                        help='Use this option to get reproducible results')
 
-        runs.addParam("seed", params.IntParam,
-                       label='Set seed',
-                       default=1111111,
-                       condition="cseed",
+        runs.addParam("seed", params.IntParam, label='Set seed: ', default=1111111, condition="cseed",
                        help='Set a integer number as constant seed. The default one is 1111111 ')
 
         form.addParallelSection(threads=4, mpi=1)
-        form.addHidden(GPU_LIST, params.StringParam,
-                       label='Choose GPU ID',
-                       default='1',
-                       help="GPU may have several cores. Set it one if "
-                            "you don't know what we are talking about but you have a GPU."
-                            "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
-                            "to use GPU")
 
  # --------------------------- STEPS functions ------------------------------
 
@@ -242,7 +196,7 @@ class RosettaProtDARC(EMProtocol):
         # Insert processing steps
         cId = self._insertFunctionStep('convertInputStep', prerequisites=[])
         raysSteps = []
-        if self.fromPockets:
+        if self.fromReceptor == 1:
             for pocket in self.inputStructROIs.get():
                 gId = self._insertFunctionStep('generateRaysStep', pocket.clone(), prerequisites=[cId])
                 raysSteps.append(gId)
@@ -251,49 +205,33 @@ class RosettaProtDARC(EMProtocol):
           raysSteps.append(gId)
 
         darcSteps = []
-        usedBases = []
-        for mol in self.inputLigands.get():
-            if not mol.getMolName() in usedBases:
-                if self.fromPockets:
-                    for pocket in self.inputStructROIs.get():
-                        dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
-                        darcSteps.append(dId)
-                else:
-                    dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=raysSteps)
+        for mol in self.inputSmallMolecules.get():
+            if self.fromReceptor == 1:
+                for pocket in self.inputStructROIs.get():
+                    dId = self._insertFunctionStep('darcStep', mol.clone(), pocket.clone(), prerequisites=raysSteps)
                     darcSteps.append(dId)
-                usedBases.append(mol.getMolName())
+            else:
+                dId = self._insertFunctionStep('darcStep', mol.clone(), prerequisites=raysSteps)
+                darcSteps.append(dId)
 
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
     def convertInputStep(self):
         #Converting the ADT grid to the Rosetta agd format
-        if not self.shape_only:
+        if self.use_electro:
             adtGridName = self.grid.get().getFileName().split('/')[-1]
             self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
-
 
         # Generate params file that DARC will use to dock the ligand in the target protein
         writtenFiles = []
         with open(self._getExtraPath("molfile_list.txt"), "w+") as file:
-            for mol in self.inputLigands.get():
-                confFile = mol.getConformersFileName()
-
-                if confFile != None and not confFile in writtenFiles:
-                    writtenFiles.append(confFile)
-                    if not 'mol2' in confFile and not 'sdf' in confFile:
-                        confFile = self.convertConformersFile(confFile, outExt='mol2')
-                    else:
-                        confFile = os.path.abspath(confFile)
-                    file.write(os.path.abspath(confFile) + "\n")
-
-                elif confFile == None:
-                    writtenFiles.append(confFile)
-                    molFile = mol.getFileName()
-                    if not 'mol2' in molFile and not 'sdf' in molFile:
-                        confFile = self.convertFile(molFile)
-                    else:
-                        confFile = os.path.abspath(molFile)
-                    file.write(os.path.abspath(confFile) + "\n")
+            for mol in self.inputSmallMolecules.get():
+                molFile = mol.getFileName()
+                if not 'mol2' in molFile and not 'sdf' in molFile:
+                    confFile = self.convertFile(molFile)
+                else:
+                    confFile = os.path.abspath(molFile)
+                file.write(os.path.abspath(confFile) + "\n")
 
         # 2. Launch batch_molfile_to_params.py for each file. It will generate a pdb file and params file
         database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
@@ -324,10 +262,10 @@ class RosettaProtDARC(EMProtocol):
             args = self.getRaysArgs(outDir=rayDir, pocket=pocket)
             # Generate 2 file with different formats (pdb (rays are hetatm) and txt).
             # Run Make Ray Files w/wo GPU
-            if GPU_LIST == 0:
+            if not getattr(self, USE_GPU):
                 Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES), args, cwd=rayDir)
             else:
-                args += " -gpu %s" % str(self.gpuList.get())
+                args += " -gpu %s" % str(getattr(self, GPU_LIST).get())
                 Plugin.runRosettaProgram(Plugin.getProgram(MAKE_RAY_FILES_GPU), args, cwd=rayDir)
         else:
             rayDir = self._getExtraPath('pocket_1')
@@ -375,7 +313,7 @@ class RosettaProtDARC(EMProtocol):
         args += " -ray_file %s" % os.path.abspath(ray_file)
 
         # Shape only or with electrostatics charges
-        if self.shape_only:
+        if not self.use_electro:
             args += " -darc_shape_only"
         else:
             #args += " -add_electrostatics"
@@ -421,20 +359,17 @@ class RosettaProtDARC(EMProtocol):
 
     def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
-        if self.checkSingleOutput():
-            outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
+        outputSet = SetOfSmallMolecules().create(outputPath=self._getPath())
 
         outDirs = self.getAllPocketDirs()
         for outDir in outDirs:
             savedMols = []
             scoresDic = self.parseScores(outDir)
             gridId = self.getGridId(outDir)
-            if not self.checkSingleOutput():
-                outputSet = SetOfSmallMolecules().create(outputPath=self._getPath(), suffix=gridId)
 
             pdbFiles = self.getLigandFiles(outDir)
-            for mol in self.inputLigands.get():
-                molName, molBase = mol.getUniqueName(), mol.getMolName()
+            for mol in self.inputSmallMolecules.get():
+                molName, molBase = mol.getUniqueName(), self.getConfName(mol)
                 for pFile in pdbFiles:
                     if molBase in pFile and not molBase in savedMols:
                         if not self.minimize_output or 'mini_' in pFile:
@@ -452,20 +387,17 @@ class RosettaProtDARC(EMProtocol):
                           outputSet.append(newMol)
                           savedMols.append(molBase)
 
-            if not self.checkSingleOutput():
-              outputSet.proteinFile.set(self.getOriginalReceptorFile())
-              outputSet.setDocked(True)
-              self._defineOutputs(**{'outputSmallMolecules_{}'.format(gridId): outputSet})
-              self._defineSourceRelation(self.inputLigands, outputSet)
 
-        if self.checkSingleOutput():
-          outputSet.setDocked(True)
-          outputSet.proteinFile.set(self.getOriginalReceptorFile())
-          self._defineOutputs(outputSmallMolecules=outputSet)
-          self._defineSourceRelation(self.inputLigands, outputSet)
+        outputSet.setDocked(True)
+        outputSet.proteinFile.set(self.getOriginalReceptorFile())
+        self._defineOutputs(outputSmallMolecules=outputSet)
+        self._defineSourceRelation(self.inputSmallMolecules, outputSet)
 
 
 ############################## UTILS ########################
+    def getConfName(self, mol):
+        return mol.getUniqueName(grid=False, dock=False, pose=False)
+
     def getRaysArgs(self, outDir, pocket=None):
         # Add protein file where the program will generate the rays (REQUIRED)
         pdb_file = self.getOriginalReceptorFile()
@@ -506,7 +438,7 @@ class RosettaProtDARC(EMProtocol):
             args += "-origin_res_num %i" % (self.origin_residue.get())  # number of residue in a chain
 
         # To include electrostatics calculations
-        if not self.shape_only:
+        if self.use_electro:
             grid_file = self.getAGDFile()
             args += " -espGrid_file %s" % os.path.abspath(grid_file)
 
@@ -533,7 +465,7 @@ class RosettaProtDARC(EMProtocol):
 
     def getOriginalReceptorFile(self):
         if not hasattr(self, 'originalReceptorFile'):
-            if not self.fromPockets:
+            if self.fromReceptor == 0:
                 pdb_file = self.inputAtomStruct.get().getFileName()
             else:
                 pdb_file = self.inputStructROIs.get().getProteinFile()
@@ -582,7 +514,7 @@ class RosettaProtDARC(EMProtocol):
 
     def getParamsDir(self, mol):
         for dir in os.listdir(self._getExtraPath('params')):
-            if mol.getMolName() in dir:
+            if self.getConfName(mol) == dir:
                 return self._getExtraPath('params/{}'.format(dir))
 
     def changeParamFileCode(self, file, ligand):
@@ -594,13 +526,10 @@ class RosettaProtDARC(EMProtocol):
         ligandDir, ligandFn = os.path.split(file)
         ligandCode = ligandFn.split(sep)[0]
 
-        newLigandFile = os.path.join(ligandDir, ligandFn.replace(ligandCode, ligand.getMolName()))
+        newLigandFile = os.path.join(ligandDir, ligandFn.replace(ligandCode, self.getConfName(ligand)))
         if file != newLigandFile:
             shutil.copy(file, newLigandFile)
         return newLigandFile
-
-    def checkSingleOutput(self):
-        return self.mergeOutput.get() or len(self.getAllPocketDirs()) == 1
 
     def convertFile(self, inFile, outExt='mol2', outDir=None):
         if outDir == None:

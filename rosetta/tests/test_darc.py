@@ -30,26 +30,15 @@ from pyworkflow.tests import *
 
 from pwem.protocols import ProtImportPdb, ProtSetFilter
 from rosetta.protocols import RosettaProteinPreparation, RosettaProtDARC
-from pwchem.protocols import ProtChemImportSmallMolecules, ProtChemOBabelPrepareLigands
+from pwchem.protocols import ProtChemImportSmallMolecules, ProtChemOBabelPrepareLigands, \
+  ProtChemRDKitPrepareLigands, ProtDefineStructROIs
 
-pocketFinder=None
 try:
-    from autodock.protocols import ProtChemADTPrepareLigands, Autodock_GridGeneration, ProtChemAutoLigand
+    from autodock.protocols import Autodock_GridGeneration
     ADT = True
-    try:
-        from p2rank.protocols import P2RankFindPockets
-        pocketFinder = 'p2rank'
-    except:
-        pocketFinder = 'autoligand'
 except:
     print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
     ADT = False
-    try:
-        from fpocket.protocols import FpocketFindPockets
-        pocketFinder = 'fpocket'
-    except:
-        print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'
-              'Test on pocket will not be performed')
 
 class TestImportBase(BaseTest):
     '''Initial protocols needed to run DARC. Paralelized and checking with plugins are available'''
@@ -65,22 +54,18 @@ class TestImportBase(BaseTest):
       cls._waitOutput(cls.protImportSmallMols, 'outputSmallMolecules', sleepTime=5)
 
       cls._runPrepareLigandsOBabel()
+      cls._runPrepareLigandsRDKit()
       cls._runPrepareReceptor()
+
       cls._waitOutput(cls.protOBabel, 'outputSmallMolecules', sleepTime=5)
+      cls._waitOutput(cls.protPrepareLigandRDKit, 'outputSmallMolecules', sleepTime=5)
       cls._waitOutput(cls.protPrepareReceptor, 'outputStructure', sleepTime=5)
 
       if ADT:
-          cls._runPrepareLigandsADT()
           cls._runGridGeneration()
 
-      if pocketFinder != None:
-          if pocketFinder == 'autoligand':
-              cls._waitOutput(cls.protGridADT, 'outputGrid', sleepTime=5)
-          pocketProt = cls._runPocketFinder()
-          cls._waitOutput(pocketProt, 'outputStructROIs', sleepTime=5)
-          cls._runSetFilter(inProt=pocketProt, number=2, property='_score')
-
-      cls._waitOutput(cls.protPrepareLigandADT, 'outputSmallMolecules', sleepTime=5)
+      cls.pocketProt = cls._runPocketFinder()
+      cls._waitOutput(cls.pocketProt, 'outputStructROIs', sleepTime=5)
 
     @classmethod
     def _runImportSmallMols(cls):
@@ -110,15 +95,14 @@ class TestImportBase(BaseTest):
       cls.proj.launchProtocol(cls.protOBabel, wait=False)
 
     @classmethod
-    def _runPrepareLigandsADT(cls):
-      cls.protPrepareLigandADT = cls.newProtocol(
-        ProtChemADTPrepareLigands,
-        doConformers=True, method_conf=0, number_conf=2,
-        rmsd_cutoff=0.375)
-      cls.protPrepareLigandADT.inputSmallMols.set(cls.protImportSmallMols)
-      cls.protPrepareLigandADT.inputSmallMols.setExtended('outputSmallMolecules')
+    def _runPrepareLigandsRDKit(cls):
+      cls.protPrepareLigandRDKit = cls.newProtocol(
+        ProtChemRDKitPrepareLigands,
+        doConformers=True, numConf=2)
+      cls.protPrepareLigandRDKit.inputSmallMols.set(cls.protImportSmallMols)
+      cls.protPrepareLigandRDKit.inputSmallMols.setExtended('outputSmallMolecules')
 
-      cls.proj.launchProtocol(cls.protPrepareLigandADT, wait=False)
+      cls.proj.launchProtocol(cls.protPrepareLigandRDKit, wait=False)
 
     @classmethod
     def _runPrepareReceptor(cls):
@@ -132,35 +116,13 @@ class TestImportBase(BaseTest):
 
     @classmethod
     def _runPocketFinder(cls):
-        if pocketFinder == 'autoligand':
-          protPocketFinder = cls.newProtocol(
-            ProtChemAutoLigand,
-            inputAtomStruct=cls.protPrepareReceptor.outputStructure,
-            prevGrid=True, inputGrid=cls.protGridADT.outputGrid,
-            nFillPoints=10)
-        elif pocketFinder == 'p2rank':
-          protPocketFinder = cls.newProtocol(
-            P2RankFindPockets,
-            inputAtomStruct=cls.protPrepareReceptor.outputStructure)
-        elif pocketFinder == 'fpocket':
-          protPocketFinder = cls.newProtocol(
-            FpocketFindPockets,
-            inputAtomStruct=cls.protPrepareReceptor.outputStructure)
+        protPocketFinder = cls.newProtocol(
+          ProtDefineStructROIs,
+          inputAtomStruct=cls.protPrepareReceptor.outputStructure,
+          inResidues='{"model": 0, "chain": "C", "index": "99-99", "residues": "I"}')
 
         cls.proj.launchProtocol(protPocketFinder, wait=False)
         return protPocketFinder
-
-    @classmethod
-    def _runSetFilter(cls, inProt, number, property):
-      cls.protFilter = cls.newProtocol(
-        ProtSetFilter,
-        operation=ProtSetFilter.CHOICE_RANKED,
-        threshold=number, rankingField=property)
-      cls.protFilter.inputSet.set(inProt)
-      cls.protFilter.inputSet.setExtended('outputStructROIs')
-
-      cls.proj.launchProtocol(cls.protFilter, wait=False)
-      return cls.protFilter
 
     @classmethod
     def _runGridGeneration(cls):
@@ -176,26 +138,26 @@ class TestImportBase(BaseTest):
 
     def _runDARC(self, ADTLigs=False, pocketsProt=None, gridProt=None):
         if ADTLigs:
-            protLigs = self.protPrepareLigandADT
+            protLigs = self.protPrepareLigandRDKit
         else:
             protLigs = self.protOBabel
 
         if pocketsProt == None:
             protDARC = self.newProtocol(
                 RosettaProtDARC,
-                fromPockets=False,
+                fromReceptor=0,
                 target_residue='99:C',
                 numberOfThreads=8)
 
             protDARC.inputAtomStruct.set(self.protPrepareReceptor)
             protDARC.inputAtomStruct.setExtended('outputStructure')
-            protDARC.inputLigands.set(protLigs)
-            protDARC.inputLigands.setExtended('outputSmallMolecules')
+            protDARC.inputSmallMolecules.set(protLigs)
+            protDARC.inputSmallMolecules.setExtended('outputSmallMolecules')
 
             if gridProt == None:
-                protDARC.shape_only.set(True)
+                protDARC.use_electro.set(False)
             else:
-                protDARC.shape_only.set(False)
+                protDARC.use_electro.set(True)
                 protDARC.grid.set(gridProt)
                 protDARC.grid.setExtended('outputGrid')
 
@@ -205,19 +167,18 @@ class TestImportBase(BaseTest):
         else:
             protDARC = self.newProtocol(
                 RosettaProtDARC,
-                fromPockets=True,
-                mergeOutput=True,
+                fromReceptor=1,
                 numberOfThreads=8)
 
-            protDARC.inputStructROIs.set(self.protFilter)
+            protDARC.inputStructROIs.set(self.pocketProt)
             protDARC.inputStructROIs.setExtended('outputStructROIs')
-            protDARC.inputLigands.set(protLigs)
-            protDARC.inputLigands.setExtended('outputSmallMolecules')
+            protDARC.inputSmallMolecules.set(protLigs)
+            protDARC.inputSmallMolecules.setExtended('outputSmallMolecules')
 
             if gridProt == None:
-                protDARC.shape_only.set(True)
+                protDARC.use_electro.set(False)
             else:
-                protDARC.shape_only.set(False)
+                protDARC.use_electro.set(True)
                 protDARC.grid.set(gridProt)
                 protDARC.grid.setExtended('outputGrid')
 
@@ -239,12 +200,7 @@ class TestDARC(TestImportBase):
         """ Complete Docking from protein pockets and shape only
         """
         print("\n Complete Docking from protein pockets and shape only \n")
-        if pocketFinder!=None:
-            self._waitOutput(self.protFilter, 'outputStructROIs', sleepTime=5)
-            protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.protFilter)
-        else:
-            print('Cannot import any pocket finder (autoligand, p2rank, fpocket).'
-                  'Test on pocket will not be performed')
+        protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.pocketProt)
 
     def test_3(self):
         """ Complete Docking from whole protein and ADT electrostatics
@@ -262,6 +218,6 @@ class TestDARC(TestImportBase):
         print("\n Complete Docking from protein pockets and ADT electrostatics \n")
         if ADT:
           protDARC = self._runDARC(gridProt=self.protGridADT,
-                                   pocketsProt=self.protFilter)
+                                   pocketsProt=self.pocketProt)
         else:
           print('Autodock cannot be imported, docking with electrostatics cannot be made')
