@@ -27,3 +27,4 @@
 
 from .test_target_preparation import TestTargetPreparation
 from .test_darc import TestDARC
+from .test_generate_structures import TestGenerateStructures
