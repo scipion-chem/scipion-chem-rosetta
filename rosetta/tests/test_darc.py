@@ -89,8 +89,8 @@ class TestImportBase(BaseTest):
         inputType=0, method_charges=0,
         doConformers=True, method_conf=0, number_conf=2,
         rmsd_cutoff=0.375)
-      cls.protOBabel.inputSmallMols.set(cls.protImportSmallMols)
-      cls.protOBabel.inputSmallMols.setExtended('outputSmallMolecules')
+      cls.protOBabel.inputSmallMolecules.set(cls.protImportSmallMols)
+      cls.protOBabel.inputSmallMolecules.setExtended('outputSmallMolecules')
 
       cls.proj.launchProtocol(cls.protOBabel, wait=False)
 
@@ -99,8 +99,8 @@ class TestImportBase(BaseTest):
       cls.protPrepareLigandRDKit = cls.newProtocol(
         ProtChemRDKitPrepareLigands,
         doConformers=True, numConf=2)
-      cls.protPrepareLigandRDKit.inputSmallMols.set(cls.protImportSmallMols)
-      cls.protPrepareLigandRDKit.inputSmallMols.setExtended('outputSmallMolecules')
+      cls.protPrepareLigandRDKit.inputSmallMolecules.set(cls.protImportSmallMols)
+      cls.protPrepareLigandRDKit.inputSmallMolecules.setExtended('outputSmallMolecules')
 
       cls.proj.launchProtocol(cls.protPrepareLigandRDKit, wait=False)
 
@@ -119,7 +119,7 @@ class TestImportBase(BaseTest):
         protPocketFinder = cls.newProtocol(
           ProtDefineStructROIs,
           inputAtomStruct=cls.protPrepareReceptor.outputStructure,
-          inResidues='{"model": 0, "chain": "C", "index": "99-99", "residues": "I"}')
+          inROIs='1) Residues: {"model": 0, "chain": "C", "index": "99-99", "residues": "I"}')
 
         cls.proj.launchProtocol(protPocketFinder, wait=False)
         return protPocketFinder
