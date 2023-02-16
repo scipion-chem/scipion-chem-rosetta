@@ -31,8 +31,10 @@ import glob
 from tkinter import messagebox
 
 from pyworkflow.protocol.params import LabelParam, EnumParam
-from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
-from pwem.viewers import ChimeraView
+from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer, Viewer
+
+from pwem.viewers import ChimeraView, Chimera
+
 from pwchem.utils.utilsViewer import *
 from pwchem.viewers import SmallMoleculesViewer
 
@@ -66,47 +68,36 @@ class DARCViewer(SmallMoleculesViewer):
 
     def _defineParams(self, form):
         super()._defineParams(form)
-        form.addSection(label='Visualize with ChimeraX')
+        form.addSection(label='DARC docking')
         # group = form.addGroup('Overall results')
         view = form.addGroup("Visualization in Chimerax")
         view.addParam('show_complex', LabelParam,
                       label="Visualize complex protein-ligand")
 
-        view.addParam('complex_v', EnumParam,
-                      choices= self.complexNames,
-                      default=0,
-                      label="Choose a complex: ",
-                      help="")
+        view.addParam('complex_v', EnumParam, choices= self.complexNames, default=0, label="Choose a complex: ")
 
         view.addParam('show_ligand', LabelParam,
                       label="Visualize only ligand conformation")
 
-        view.addParam('ligand_v', EnumParam,
-                      choices= self.ligandsNames,
-                      default=0,
-                      label="Choose a ligand: ",
-                      help="")
+        view.addParam('ligand_v', EnumParam, choices=self.ligandsNames, default=0, label="Choose a ligand: ")
 
         if self.protocol.minimize_output.get():
             view_mini = form.addGroup("Visualization of complexes after minimization")
             view_mini.addParam('show_complex_mini', LabelParam,
                           label="Visualize complex protein-ligand")
 
-            view_mini.addParam('complex_v_mini', EnumParam,
-                          choices= self.complexNames_mini,
-                          default=0,
-                          label="Choose a complex: ",
-                          help="")
+            view_mini.addParam('complex_v_mini', EnumParam, choices= self.complexNames_mini, default=0,
+                          label="Choose a complex: ")
 
-            view_mini.addParam('show_ligand_mini', LabelParam,
-                          label="Visualize only ligand conformation")
+            view_mini.addParam('show_ligand_mini', LabelParam, label="Visualize only ligand conformation")
 
-            view_mini.addParam('ligand_v_mini', EnumParam,
-                          choices= self.ligandsNames_mini,
-                          default=0,
-                          label="Choose a ligand: ",
-                          help="")
+            view_mini.addParam('ligand_v_mini', EnumParam, choices= self.ligandsNames_mini, default=0,
+                          label="Choose a ligand: ")
 
+        view = form.addGroup("Rays viewer")
+        view.addParam('displayRaysROI', EnumParam,
+                       choices=self.getChoices(vType='pocket')[0], default=0,
+                       label='Display rays in ROI: ', help='Display rays on this ROI')
 
     def _getVisualizeDict(self):
         viewDic = super()._getVisualizeDict()
@@ -115,6 +106,7 @@ class DARCViewer(SmallMoleculesViewer):
             'ligand_v': self._visualizeLigand,
             'complex_v_mini': self._visualize_miniComplex,
             'ligand_v_mini': self._visualize_miniLigand,
+            'displayRaysROI': self._visualizeRays
         }
         viewDic.update(darcDic)
         return viewDic
@@ -143,6 +135,18 @@ class DARCViewer(SmallMoleculesViewer):
         basename = self.ligandsNames_mini[self.ligand_v_mini.get()]
         path = os.path.abspath(self.ligandsDic_mini[basename])
         return self.displayChimera(file_path= path)
+
+    def _visualizeRays(self, e=None):
+        ligandLabel = self.getEnumText('displayRaysROI').replace('g_', 'pocket_')
+        pocketDir = self.protocol._getExtraPath(ligandLabel)
+        for file in os.listdir(pocketDir):
+            if file.startswith('ray') and file.endswith('pdb'):
+                raysFile = os.path.join(pocketDir, file)
+                break
+
+        pdbFile = os.path.join(pocketDir, file.split('_')[1] + '.pdb')
+        raysV = RaysViewer(project=self.getProject())
+        return raysV._visualize([raysFile, pdbFile], cwd=self.protocol._getExtraPath())
 
 
 
@@ -173,3 +177,36 @@ class DARCViewer(SmallMoleculesViewer):
                     filesDic[names[-1]] = f
         names.sort()
         return filesDic, names
+
+class RaysViewer(Viewer):
+  """ Viewer for Rosetta program make ray file
+  """
+  _label = 'Rays Viewer'
+  _environments = [DESKTOP_TKINTER, WEB_DJANGO]
+  _targets = [RosettaProtDARC]
+
+  def _visualize(self, obj, cwd=None, **args):
+    # Get the rays pdb file
+    dim = 150.
+    sampling = 1.
+
+    oDir = cwd if cwd else self._getTmpPath()
+
+    bildFileName = os.path.join(oDir, "axis_output.bild")
+    Chimera.createCoordinateAxisFile(dim, bildFileName=bildFileName, sampling=sampling)
+
+    raysFile, pdbFile = obj
+    fnCmd = os.path.join(oDir, "chimera_output.cxc")
+    f = open(fnCmd, 'w')
+    # change to workingDir
+    # If we do not use cd and the project name has an space the protocol fails even if we pass absolute paths
+    f.write('cd %s\n' % os.getcwd())
+    f.write("open %s\n" % bildFileName)
+    f.write("cofr 0,0,0\n")  # set center of coordinates
+    f.write("open %s\n" % raysFile)
+    f.write("style stick\n")
+    f.write("open %s\n" % pdbFile)
+    f.write("show surfaces\n")
+
+    view = ChimeraView(fnCmd)
+    return [view]

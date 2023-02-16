@@ -109,13 +109,13 @@ class ProtRosettaGenerateStructures(EMProtocol):
                        default=False, help='Whether the input protein is placed into a membrane')
 
         form.addParallelSection(threads=4, mpi=1)
-        form.addHidden(params.GPU_LIST, params.StringParam,
-                       label='Choose GPU ID',
-                       default='1',
-                       help="GPU may have several cores. Set it one if "
-                            "you don't know what we are talking about but you have a GPU."
-                            "For DARC, first core index is 1, second 2, and so on. Write 0 if you do not want"
-                            "to use GPU")
+        form.addHidden(params.USE_GPU, params.BooleanParam, default=True,
+                       label="Use GPU for execution: ",
+                       help="This protocol has both CPU and GPU implementation.\
+                                                         Select the one you want to use.")
+
+        form.addHidden(params.GPU_LIST, params.StringParam, default='0', label="Choose GPU IDs",
+                       help="Add a list of GPU devices that can be used")
 
  # --------------------------- STEPS functions ------------------------------
 
@@ -181,7 +181,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
       self.writeRosettaXML(xmlRosettaFile)
 
       print('Launching Rosetta scripts')
-      if params.GPU_LIST == 0:
+      if not getattr(self, params.USE_GPU):
         program = Plugin.getProgram(program)
         print(program, args)
         print('---------------------------\n')
@@ -189,7 +189,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
         Plugin.runRosettaProgram(program, args, cwd=self._getPath())
       else:
         programGPU = Plugin.getProgram(programGPU)
-        args += " -gpu %s" % str(self.gpuList.get())
+        args += " -gpu %s" % str(getattr(self, params.GPU_LIST).get())
         print(programGPU, args)
         print('---------------------------\n')
         sys.stdout.flush()

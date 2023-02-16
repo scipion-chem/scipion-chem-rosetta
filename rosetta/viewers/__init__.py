@@ -5,5 +5,3 @@
 # **************************************************************************
 
 from .viewer_darc import DARCViewer
-from .viewer_rays import RaysViewer
-from .viewer_data import RosettaViewer

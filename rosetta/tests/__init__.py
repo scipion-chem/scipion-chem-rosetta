@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Alberto M. Parra Pérez (amparraperez@gmail.com)
+# * Authors:     Daniel Del Hoyo Gomez (ddelhoyo@cnb.csic.es)
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -24,7 +24,6 @@
 # *
 # **************************************************************************
 
-
-from .test_target_preparation import TestTargetPreparation
-from .test_generate_rays import TestRaysGeneration
-from .test_darc import TestDARC
+from rosetta.tests.test_darc import *
+from rosetta.tests.test_target_preparation import *
+from rosetta.tests.test_generate_structures import *
