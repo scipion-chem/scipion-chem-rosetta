@@ -160,20 +160,20 @@ class RosettaProteinPreparation(EMProtocol):
 
         # Take the cleaned pdb file
 
-        pdb_file = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
-        name_pdbfile = os.path.splitext(os.path.basename(pdb_file))[0]
+        pdbFile = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
+        pdbName = os.path.splitext(os.path.basename(pdbFile))[0]
 
-        self.name_protein = name_pdbfile.split("_")[0]
-        pdb_file = os. path.abspath(pdb_file)
+        self.protName = pdbName.split("_")[0]
+        pdbFile = os. path.abspath(pdbFile)
 
         # Create the args of the program
         args = ""
         args += " -in:file:"
-        args += "s %s" % pdb_file # PDB file to add missing atoms
+        args += "s %s" % pdbFile # PDB file to add missing atoms
 
         args += " -out:output -no_optH false"
 
-        args += " -out:file:scorefile %s.sc" % name_pdbfile
+        args += " -out:file:scorefile %s.sc" % pdbName
 
         if self.cseed.get():
             args += " -run:constant_seed"
@@ -186,10 +186,10 @@ class RosettaProteinPreparation(EMProtocol):
         Plugin.runRosettaProgram(Plugin.getProgram(SCORE), args, cwd=self._getPath())
 
         #Move and rename the files to Path from the ExtraPath
-        scoresFile = self._getPath("%s_0001.pdb" % name_pdbfile)
-        pdbOut = self._getPath("%s.pdb" % self.name_protein)
+        scoresFile = self._getPath("%s_0001.pdb" % pdbName)
+        pdbOut = self._getPath("%s.pdb" % self.protName)
         self.cleanScores(scoresFile, pdbOut)
-        shutil.move(self._getPath("%s.sc" % name_pdbfile), self._getExtraPath("%s.sc" % self.name_protein))
+        shutil.move(self._getPath("%s.sc" % pdbName), self._getExtraPath("%s.sc" % self.protName))
 
         self._store()
 
@@ -198,17 +198,17 @@ class RosettaProteinPreparation(EMProtocol):
         """ Create a object atomStruct as a output from cleaned pdb with missing atoms
         """
 
-        pdb_file = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
-        name_pdbfile = os.path.splitext(os.path.basename(pdb_file))[0]
-        name_protein = name_pdbfile.split("_")[0]
+        pdbFile = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
+        pdbName = os.path.splitext(os.path.basename(pdbFile))[0]
+        protName = pdbName.split("_")[0]
 
         if self.addH.get():
-            pdb_file_out = self._getPath('%s.pdb' % name_protein)
+            pdbFileOut = self._getPath('%s.pdb' % protName)
         else:
-            pdb_file_out = pdb_file
+            pdbFileOut = pdbFile
 
-        if os.path.exists(os.path.expanduser(pdb_file_out)):
-            target = AtomStruct(filename=pdb_file_out)
+        if os.path.exists(os.path.expanduser(pdbFileOut)):
+            target = AtomStruct(filename=pdbFileOut)
             self._defineOutputs(outputStructure=target)
             self._defineSourceRelation(self.inputAtomStruct, target)
 
@@ -250,14 +250,14 @@ class RosettaProteinPreparation(EMProtocol):
 
         if self.isFinished():
 
-            pdb_file = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
-            name_pdbfile = os.path.splitext(os.path.basename(pdb_file))[0]
-            name_protein = name_pdbfile.split("_")[0]
+            pdbFile = glob.glob(self._getExtraPath("*_clean.pdb"))[0]
+            pdbName = os.path.splitext(os.path.basename(pdbFile))[0]
+            protName = pdbName.split("_")[0]
 
-            filename = os.path.basename(self._getPath('%s.pdb' % name_protein))
-            filename_original = os.path.basename(self._getExtraPath('%s.pdb' % name_protein))
-            filename_clean = os.path.basename(self._getExtraPath('%s_clean.pdb' % name_protein))
-            filename_sc = os.path.basename(self._getExtraPath('%s.sc' % name_protein))
+            filename = os.path.basename(self._getPath('%s.pdb' % protName))
+            filename_original = os.path.basename(self._getExtraPath('%s.pdb' % protName))
+            filename_clean = os.path.basename(self._getExtraPath('%s_clean.pdb' % protName))
+            filename_sc = os.path.basename(self._getExtraPath('%s.sc' % protName))
 
             if self.rchains.get():
                 chain = json.loads(self.chain_name.get())  # From wizard dictionary

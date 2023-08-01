@@ -203,7 +203,7 @@ class ProtRosettaGenerateStructures(EMProtocol):
                 pdbFile = self._getPath(file)
                 aStr = AtomStruct(filename=pdbFile)
                 outVol = self._getInputVolume().clone()
-                outVol.setLocation(os.path.abspath(self._getExtraPath('inpVolume.mrc')))
+                outVol.setLocation(self._getExtraPath('inpVolume.mrc'))
                 aStr.setVolume(outVol)
                 outputSet.append(aStr)
 
