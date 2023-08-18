@@ -1,0 +1,14 @@
+{
+	"datasets": ["model_building_tutorial", "smallMolecules"],
+	"skippable": {
+		"gpu": [
+			
+		],
+		"dependencies": [
+			
+		],
+		"others": [
+			
+		]
+	}
+}
