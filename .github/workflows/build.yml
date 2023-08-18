@@ -36,40 +36,34 @@ jobs:
         eval "$(miniconda/bin/conda shell.bash hook)"
         pip3 install --user scipion-installer
         python3 -m scipioninstaller -conda -noXmipp -noAsk scipion
-    
-    # Install scipion-chem
-    - name: Install scipion-chem
-      working-directory: ${{ github.workspace }}/../
-      run: |
-        git clone https://github.com/scipion-chem/scipion-chem.git
-        scipion/scipion3 installp -p scipion-chem --devel
 
+    # Installing scipion-chem
     # Checkout scipion-chem to Pull Request branch if exists, by default stays in devel
-    - name: Conditionally checkout scipion-chem to ${{ github.head_ref }}
-      working-directory: ${{ github.workspace }}/../scipion-chem
-      env:
-        BRANCH_NAME: ${{ github.head_ref }}
-      run: |
-        if [ $(git ls-remote --heads https://github.com/scipion-chem/scipion-chem.git $BRANCH_NAME | wc -l) -eq 1 ]; then
-          git checkout $BRANCH_NAME
-        fi
-
-    # Install scipion-chem-autodock
-    - name: Install scipion-chem-autodock
+    - name: Install scipion-chem (in branch ${{ github.head_ref }} if exists)
       working-directory: ${{ github.workspace }}/../
-      run: |
-        git clone https://github.com/scipion-chem/scipion-chem-autodock.git
-        scipion/scipion3 installp -p scipion-chem-autodock --devel
-
-    # Checkout scipion-chem-autodock to Pull Request branch if exists, by default stays in devel
-    - name: Conditionally checkout scipion-chem-autodock to ${{ github.head_ref }}
-      working-directory: ${{ github.workspace }}/../scipion-chem
       env:
+        REPO_NAME: scipion-chem
         BRANCH_NAME: ${{ github.head_ref }}
       run: |
-        if [ $(git ls-remote --heads https://github.com/scipion-chem/scipion-chem-autodock.git $BRANCH_NAME | wc -l) -eq 1 ]; then
-          git checkout $BRANCH_NAME
+        git clone https://github.com/scipion-chem/$REPO_NAME.git
+        if [ $(git ls-remote --heads https://github.com/scipion-chem/scipion-chem.git $BRANCH_NAME | wc -l) -eq 1 ]; then
+          cd $REPO_NAME && git checkout $BRANCH_NAME
         fi
+        scipion/scipion3 installp -p $REPO_NAME --devel
+
+    # Installing scipion-chem-autodock
+    # Checkout scipion-chem-autodock to Pull Request branch if exists, by default stays in devel
+    - name: Install scipion-chem-autodock (in branch ${{ github.head_ref }} if exists)
+      working-directory: ${{ github.workspace }}/../
+      env:
+        REPO_NAME: scipion-chem-autodock
+        BRANCH_NAME: ${{ github.head_ref }}
+      run: |
+        git clone https://github.com/scipion-chem/$REPO_NAME.git
+        if [ $(git ls-remote --heads https://github.com/scipion-chem/scipion-chem.git $BRANCH_NAME | wc -l) -eq 1 ]; then
+          cd $REPO_NAME && git checkout $BRANCH_NAME
+        fi
+        scipion/scipion3 installp -p $REPO_NAME --devel
     
     # Check out the repository in the pull request
     - name: Checkout repository
