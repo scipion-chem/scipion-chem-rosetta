@@ -50,7 +50,7 @@ import os, shutil, json, glob
 from rosetta import Plugin
 from rosetta.constants import *
 
-from pwchem.utils import clean_PDB
+from pwchem.utils import cleanPDB
 
 
 class RosettaProteinPreparation(EMProtocol):
@@ -148,7 +148,7 @@ class RosettaProteinPreparation(EMProtocol):
             modelChains = chainJson["model-chain"].upper().strip()
             chain_ids = [x.split('-')[1] for x in modelChains.split(',')]
 
-        cleanedPDB = clean_PDB(self.inputAtomStruct.get().getFileName(), fnPdb,
+        cleanedPDB = cleanPDB(self.inputAtomStruct.get().getFileName(), fnPdb,
                                self.waters.get(), self.HETATM.get(), chain_ids)
 
 
