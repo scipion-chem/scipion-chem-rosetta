@@ -223,21 +223,20 @@ class RosettaProtDARC(EMProtocol):
             self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
 
         # Generate params file that DARC will use to dock the ligand in the target protein
-        writtenFiles = []
         with open(self._getExtraPath("molfile_list.txt"), "w+") as file:
             for mol in self.inputSmallMolecules.get():
                 molFile = mol.getFileName()
-                if not 'mol2' in molFile and not 'sdf' in molFile:
+                if 'mol2' not in molFile and 'sdf' not in molFile:
                     confFile = self.convertFile(molFile)
                 else:
                     confFile = os.path.abspath(molFile)
                 file.write(os.path.abspath(confFile) + "\n")
 
         # 2. Launch batch_molfile_to_params.py for each file. It will generate a pdb file and params file
-        database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
-        args = " -d %s" % database_path
-        mol2params_path = os.path.join(Plugin.getHome(), ROSETTA_PARAMS_PATH, PARAMS_FILE)
-        args += " --script_path %s" % mol2params_path
+        databasePath = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
+        args = " -d %s" % databasePath
+        mol2paramsPath = os.path.join(Plugin.getHome(), ROSETTA_PARAMS_PATH, PARAMS_FILE)
+        args += " --script_path %s" % mol2paramsPath
         mollist = os.path.abspath(self._getExtraPath("molfile_list.txt"))
         args += " %s" % mollist
 
@@ -247,10 +246,10 @@ class RosettaProtDARC(EMProtocol):
         #   - 000.params
         #   - 000_conformers.pdb
         #   - log.txtç+
-        batchParamsToMol_script = getBatchMolToParamsPath()
-        self.runJob('chmod', ' 755 {}'.format(batchParamsToMol_script),
+        batchParamsToMolScript = getBatchMolToParamsPath()
+        self.runJob('chmod', ' 755 {}'.format(batchParamsToMolScript),
                          cwd=os.path.abspath(self._getExtraPath()))
-        Plugin.runRosettaProgram(batchParamsToMol_script, args=args,
+        Plugin.runRosettaProgram(batchParamsToMolScript, args=args,
                                  cwd=os.path.abspath(self._getExtraPath()))
 
     def generateRaysStep(self, pocket=None):
@@ -285,32 +284,32 @@ class RosettaProtDARC(EMProtocol):
         """
 
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.getOriginalReceptorFile()
+        pdbFile = self.getOriginalReceptorFile()
 
         # Save compound with errors during docking
-        compound_Error = []
+        compoundError = []
 
         rayDir = self.getPocketDir(pocket)  # Run DARC for each ligand in the set of small molecules (and his conformers)
 
         # Create the args of the program and add protein file
         args = ""
-        args += " -protein %s" % os.path.abspath(pdb_file)
+        args += " -protein %s" % os.path.abspath(pdbFile)
 
 
         paramsDir = self.getParamsDir(ligand)
         # Add ligand file
-        ligand_pdb = self.getRosettaConfFile(paramsDir, ligand)
-        newLigandPDB = self.changeParamFileCode(ligand_pdb, ligand)
+        ligandPdb = self.getRosettaConfFile(paramsDir, ligand)
+        newLigandPDB = self.changeParamFileCode(ligandPdb, ligand)
         args += " -ligand %s" % os.path.abspath(newLigandPDB)
 
         # Add params ligand file which path is in the set
-        params_file = glob.glob(os.path.join(paramsDir, "*.params"))[0]
-        newLigandParams = self.changeParamFileCode(params_file, ligand)
+        paramsFile = glob.glob(os.path.join(paramsDir, "*.params"))[0]
+        newLigandParams = self.changeParamFileCode(paramsFile, ligand)
         args += " -extra_res_fa %s" % os.path.abspath(newLigandParams)
 
         # Add protein ray file
-        ray_file = self.getRayFile(rayDir)
-        args += " -ray_file %s" % os.path.abspath(ray_file)
+        rayFile = self.getRayFile(rayDir)
+        args += " -ray_file %s" % os.path.abspath(rayFile)
 
         # Shape only or with electrostatics charges
         if not self.use_electro:
@@ -355,7 +354,7 @@ class RosettaProtDARC(EMProtocol):
                 args += " -gpu %s" % str(self.gpuList.get())
                 Plugin.runRosettaProgram(Plugin.getProgram(DARC_GPU), args, cwd=rayDir)
         except:
-            compound_Error.append(ligand_pdb)
+            compoundError.append(ligandPdb)
 
     def createOutputStep(self):
         """Create a set of darc score for each small molecule and ID"""
@@ -371,7 +370,7 @@ class RosettaProtDARC(EMProtocol):
             for mol in self.inputSmallMolecules.get():
                 molName, molBase = mol.getUniqueName(), self.getConfName(mol)
                 for pFile in pdbFiles:
-                    if molBase in pFile and not molBase in savedMols:
+                    if molBase in pFile and molBase not in savedMols:
                         if not self.minimize_output or 'mini_' in pFile:
                           newMol = SmallMolecule()
                           newMol.copy(mol, copyId=False)
@@ -400,26 +399,26 @@ class RosettaProtDARC(EMProtocol):
 
     def getRaysArgs(self, outDir, pocket=None):
         # Add protein file where the program will generate the rays (REQUIRED)
-        pdb_file = self.getOriginalReceptorFile()
-        pdb_file_extra = os.path.join(outDir, os.path.basename(pdb_file))
-        createLink(pdb_file, pdb_file_extra)
+        pdbFile = self.getOriginalReceptorFile()
+        pdbFileExtra = os.path.join(outDir, os.path.basename(pdbFile))
+        createLink(pdbFile, pdbFileExtra)
 
-        args = "-protein %s" % os.path.basename(pdb_file)
+        args = "-protein %s" % os.path.basename(pdbFile)
 
         # Add Database path
-        database_path = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
-        args += " -database %s" % database_path
+        databasePath = os.path.join(Plugin.getHome(), ROSETTA_DATABASE_PATH)
+        args += " -database %s" % databasePath
 
         # Add the specific residue that will be the center of ray generation (REQUIRED)
         # To use multiple origin points for casting rays or not
         if pocket == None:
             if self.multiple_target.get():
-                residues_string = self.target_residues.get()
-                res = list(set(list(filter(None, re.split(",|;| ", residues_string.upper()))) +
+                residuesString = self.target_residues.get()
+                res = list(set(list(filter(None, re.split(",|;| ", residuesString.upper()))) +
                           [self.target_residue.get()]))
                 target_residues = ",".join(res)
                 # res = list(map(int, res))
-                args += " -central_relax_pdb_num %s" % (self.target_residue.get(), target_residues)
+                args += " -central_relax_pdb_num %s" % (target_residues)
                 args += " -multiple_origin"
             else:
                 args += " -central_relax_pdb_num %s" % self.target_residue.get()
@@ -466,12 +465,12 @@ class RosettaProtDARC(EMProtocol):
     def getOriginalReceptorFile(self):
         if not hasattr(self, 'originalReceptorFile'):
             if self.fromReceptor == 0:
-                pdb_file = self.inputAtomStruct.get().getFileName()
+                pdbFile = self.inputAtomStruct.get().getFileName()
             else:
-                pdb_file = self.inputStructROIs.get().getProteinFile()
+                pdbFile = self.inputStructROIs.get().getProteinFile()
         else:
-            pdb_file = self.originalReceptorFile
-        return pdb_file
+            pdbFile = self.originalReceptorFile
+        return pdbFile
 
     def getReceptorName(self):
         return self.getOriginalReceptorFile().split('/')[-1].split('.')[0]
