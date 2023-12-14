@@ -25,6 +25,7 @@ Current programs implemented:
     - make_ray_files
     - DARC
 
+The full documentation to the plugin can be found in the `official documentation page <https://scipion-chem.github.io/docs/plugins/rosetta/index.html>`_.
 
 ==========================
 Install this plugin
