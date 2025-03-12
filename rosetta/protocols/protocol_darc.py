@@ -544,10 +544,10 @@ class RosettaProtDARC(EMProtocol):
         confName, ext = os.path.splitext(confFile)
         outDir = self._getTmpPath(os.path.basename(confName))
         makePath(outDir)
-        outDir = splitConformerFile(confFile, outDir)
+        molFiles = splitConformerFile(confFile, outDir)
 
         formattedFiles = []
-        for inFile in os.listdir(outDir):
+        for inFile in molFiles:
             oFile = self.convertFile(inFile, outExt=outExt, outDir=outDir)
             formattedFiles.append(oFile)
 
