@@ -75,10 +75,6 @@ class RosettaProtDARC(EMProtocol):
     """
     _label = 'DARC'
 
-    def __init__(self, **kwargs):
-        EMProtocol.__init__(self, **kwargs)
-        self.stepsExecutionMode = params.STEPS_PARALLEL
-
     # -------------------------- DEFINE param functions ----------------------
     def _defineParams(self, form):
         """ Define the input parameters that will be used.
@@ -186,8 +182,6 @@ class RosettaProtDARC(EMProtocol):
 
         runs.addParam("seed", params.IntParam, label='Set seed: ', default=1111111, condition="cseed",
                        help='Set a integer number as constant seed. The default one is 1111111 ')
-
-        form.addParallelSection(threads=4, mpi=1)
 
  # --------------------------- STEPS functions ------------------------------
 
