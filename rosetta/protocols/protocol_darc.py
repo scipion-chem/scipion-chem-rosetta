@@ -46,13 +46,7 @@ from pwchem import Plugin as pwchem_plugin
 from pwchem.constants import MGL_DIC
 
 #Soft importing autodock for electrostatic grid generation
-try:
-    from autodock import Plugin as autodock_plugin
-    from autodock.objects import GridADT
-    ADTGrid = True
-except:
-    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
-    ADTGrid = False
+ADTGrid = False
 
 import shutil
 import os, re

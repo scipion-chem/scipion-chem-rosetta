@@ -33,12 +33,7 @@ from rosetta.protocols import RosettaProteinPreparation, RosettaProtDARC
 from pwchem.protocols import ProtChemImportSmallMolecules, ProtChemOBabelPrepareLigands, \
   ProtChemRDKitPrepareLigands, ProtDefineStructROIs
 
-try:
-    from autodock.protocols import Autodock_GridGeneration
-    ADT = True
-except:
-    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
-    ADT = False
+ADT = False
 
 class TestImportBase(BaseTest):
     '''Initial protocols needed to run DARC. Paralelized and checking with plugins are available'''

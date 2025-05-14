@@ -26,10 +26,6 @@
 # **************************************************************************
 
 import math
-try:
-    from autodock.objects import GridADT
-except:
-    print('Autodock plugin cannot be imported, so ADT grid cannot be calculated')
 
 class GridAGD(GridADT):
     """ Represent a grid file in agd (ASCIII) format """
