@@ -71,11 +71,11 @@ class TestImportBase(BaseTest):
 
     @classmethod
     def _runImportPDB(cls):
-      cls.protImportPDB = cls.newProtocol(
+      protImportPDB = cls.newProtocol(
         ProtImportPdb,
-        inputPdbData=0,
-        pdbId='4erf')
-      cls.proj.launchProtocol(cls.protImportPDB, wait=False)
+        inputPdbData=1, pdbFile=cls.ds.getFile('PDBx_mmCIF/5ni1.pdb'))
+      cls.launchProtocol(protImportPDB, wait=False)
+      cls.protImportPDB = protImportPDB
 
     @classmethod
     def _runPrepareLigandsOBabel(cls):
@@ -105,7 +105,7 @@ class TestImportBase(BaseTest):
         RosettaProteinPreparation,
         inputAtomStruct=cls.protImportPDB.outputPdb,
         rchains=True,
-        chain_name='{"model": 0, "chain": "C", "residues": 93}')
+        chain_name='{"model": 0, "chain": "C", "residues": 141}')
 
       cls.proj.launchProtocol(cls.protPrepareReceptor, wait=False)
 
