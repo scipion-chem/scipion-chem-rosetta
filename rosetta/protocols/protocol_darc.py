@@ -60,12 +60,90 @@ from rosetta.utils.batchParamsToMol_script import getBatchMolToParamsPath
 
 class RosettaProtDARC(EMProtocol):
     """
-    This protocol uses a Rosetta suite program (named make_ray_files) to generate
-    a RAY file for the input protein. To generate this ray-file we need to input
-    the protein in PDB format and specify a target residue (or more than one)
-    at the interface.
+    AI Generated:
 
-    The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
+        RosettaProtDARC - User Manual
+
+        Overview
+        --------
+        The RosettaProtDARC protocol generates a RAY-based representation of a protein
+        and performs docking of small molecules using the Rosetta DARC program. The
+        protocol supports docking on either the whole protein surface or selected
+        regions (SetOfStructROIs) and can handle multiple target residues at the
+        interface. It optionally incorporates electrostatics from AutoDock grids and
+        provides GPU acceleration.
+
+        Input Requirements
+        ------------------
+        1. **Protein Structure**:
+           - A PDB-format atomic structure (`AtomStruct`) or a set of structural ROIs
+             (`SetOfStructROIs`) defining pockets for docking.
+
+        2. **Target Residues**:
+           - Single residue (`target_residue`) or multiple residues (`target_residues`)
+             can be specified as centers for ray-based pocket mapping.
+           - Optionally, define a residue origin (`origin_residue`) for ray casting.
+
+        3. **Small Molecules**:
+           - Input ligands (`SetOfSmallMolecules`) to be docked.
+
+        4. **Optional Electrostatics**:
+           - Use an AutoDock grid (`GridADT`) to incorporate electrostatics in docking
+             calculations.
+
+        5. **Docking Parameters**:
+           - Particle Swarm Optimization settings (`num_runs`, `num_particles`)
+           - Ray and ligand weighting factors (`missing_weight`, `steric_weight`, `extra_weight`)
+           - Optional reproducibility via constant seed (`cseed`, `seed`)
+           - Conformer search and energy minimization options (`search_conformers`, `minimize_output`)
+
+        Workflow
+        --------
+        1. **Input Preparation**:
+           - Convert ligands to Rosetta-compatible PDB and params files.
+           - If electrostatics is enabled, convert ADT grid to AGD format.
+
+        2. **Ray Generation**:
+           - Generate RAY files representing protein pockets around target residues.
+           - Supports GPU acceleration for ray calculation.
+
+        3. **Docking with DARC**:
+           - Each ligand is docked into the RAY-defined pockets using Rosetta DARC.
+           - Scoring can include shape only or shape + electrostatics.
+           - Supports on-the-fly conformer optimization and optional output minimization.
+
+        4. **Output Assembly**:
+           - Generates `SetOfSmallMolecules` enriched with docking scores and pose files.
+           - Each ligand is linked to its corresponding grid and docking run.
+           - Output files include PDB models of docked complexes and DARC score files.
+
+        Outputs
+        -------
+        - **Docked Ligands**: `SetOfSmallMolecules` with docking scores, poses, and grid associations.
+        - **RAY Files**: Text and PDB representations of the mapped protein pockets.
+        - **DARC Score Files**: Contains docking scores for each ligand.
+
+        Validation & Warnings
+        ---------------------
+        - Ensure the protein input is in PDB format; the protocol can convert other formats.
+        - Target residues should correspond to accessible surface regions for meaningful docking.
+        - Electrostatics calculations require a compatible AutoDock grid.
+        - GPU acceleration is optional but recommended for large systems.
+
+        Practical Recommendations
+        -------------------------
+        - Start with a single pocket or residue to validate workflow before scaling to multiple targets.
+        - Use multiple target residues to better sample protein surfaces in docking.
+        - Inspect RAY and docking outputs visually to confirm proper coverage of binding sites.
+        - Adjust particle swarm parameters and weights to fine-tune docking for specific systems.
+
+        Final Perspective
+        -----------------
+        RosettaProtDARC provides a robust workflow for docking small molecules using
+        a RAY-based representation of protein surfaces. It integrates structure-based
+        pocket mapping, optional electrostatics, and flexible ligand handling to
+        produce reproducible docking results suitable for downstream analysis in
+        Scipion-Chem.
     """
     _label = 'DARC'
 

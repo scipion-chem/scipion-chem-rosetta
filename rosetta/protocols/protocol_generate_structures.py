@@ -51,10 +51,102 @@ from rosetta.constants import *
 
 class ProtRosettaGenerateStructures(EMProtocol):
     """
-    This protocol uses a Rosetta suite program (rosetta_scripts) to generate a set of possible atomic
-    structures which fit an electronic density map.
+    AI Generated:
 
-    The output will be a file named ray_<PDBname>_0001_<TargetResidue>.txt
+        ProtRosettaGenerateStructures - User Manual
+
+        Overview
+        --------
+        The ProtRosettaGenerateStructures protocol uses the Rosetta suite program
+        (`rosetta_scripts`) to generate multiple candidate atomic structures that
+        fit a given electron density map. The protocol supports optional symmetry
+        handling, inclusion of hydrogens, and membrane protein considerations.
+        Output structures can be idealized and refined, producing files ready for
+        downstream modeling and analysis.
+
+        Input Requirements
+        ------------------
+        1. **Reference Atomic Structure**:
+           - PDB-format atomic structure (`AtomStruct`) used as input for structure
+             generation.
+           - Mandatory input.
+
+        2. **Electron Density Volume (Optional)**:
+           - Input volume (`Volume`) associated with the atomic structure.
+           - If not provided, the protocol will use the volume associated with the
+             reference structure.
+
+        3. **Resolution**:
+           - Floating-point value specifying the resolution (in Å) of the input volume.
+           - Used for weighting density terms in Rosetta calculations.
+           - Default: 3.0 Å.
+
+        4. **Number of Output Structures**:
+           - Integer specifying how many Rosetta-generated structures to produce.
+           - Default: 10.
+
+        5. **Symmetry Parameters (Optional)**:
+           - **Symmetry Type** (`sym`): C, D, T, or C1 for asymmetric units.
+           - **ASU Chains** (`asu`): Chains in the asymmetric unit, comma-delimited.
+           - **Symmetric Chains** (`symChains`): Chains related by symmetry.
+
+        6. **Other Options**:
+           - **Include Hydrogens** (`hydrogen`): Whether to include hydrogens in generated structures.
+           - **Membrane Protein** (`membrane`): Flag indicating if the protein is embedded in a membrane.
+           - **Skip Rosetta Idealize** (`skipIdealize`): Whether to bypass the idealization step.
+
+        7. **GPU Execution (Optional)**:
+           - Protocol supports CPU and GPU execution.
+           - Select GPU IDs (`GPU_LIST`) if GPU execution is enabled.
+
+        Workflow
+        --------
+        1. **Input Preparation**:
+           - Electron density volumes are converted to MRC format and header-fixed.
+           - Input atomic structures are converted to PDB format if necessary.
+           - Structures are cleaned by removing non-ATOM lines and optionally hydrogens.
+           - Symmetry-related files are generated if symmetry is specified.
+           - Optionally, structures are idealized using Rosetta Idealize.
+
+        2. **Rosetta Script Execution**:
+           - Generates candidate structures fitting the electron density using `rosetta_scripts`.
+           - Supports symmetry, DNA/RNA molecules, and membrane protein options.
+           - Parameters such as number of structures, resolution weighting, and density
+             scatterers are applied automatically.
+           - GPU acceleration can be leveraged if enabled.
+
+        3. **Output Assembly**:
+           - Generates a `SetOfAtomStructs` object containing all output structures.
+           - Each structure is associated with the corresponding volume.
+           - Outputs are linked to the input atomic structure for provenance tracking.
+
+        Outputs
+        -------
+        - **SetOfAtomStructs**: Collection of generated atomic structures.
+        - **PDB Files**: Cleaned, idealized, and symmetry-adjusted PDB files for each output structure.
+        - **Auxiliary Files**: Symmetry definition files, XML protocol files, and MRC volumes.
+
+        Validation & Warnings
+        ---------------------
+        - Ensure input structures are valid PDB files.
+        - Symmetry parameters must match the chains present in the input structure.
+        - Electron density volumes should correspond spatially to the atomic structure.
+        - GPU acceleration is optional; verify GPU availability if selected.
+
+        Practical Recommendations
+        -------------------------
+        - Start with a small number of output structures to validate workflow.
+        - Use symmetry parameters carefully; mismatched chains can produce errors.
+        - Inspect generated PDBs visually to confirm proper fitting and structure quality.
+        - Adjust resolution and density weighting for best results in high- or low-resolution maps.
+
+        Final Perspective
+        -----------------
+        ProtRosettaGenerateStructures provides a robust pipeline for generating
+        multiple candidate atomic models consistent with electron density maps.
+        By integrating Rosetta scripts with automated input preparation, symmetry
+        handling, and optional GPU acceleration, this protocol facilitates high-quality
+        structure modeling for cryo-EM, crystallography, or hybrid modeling projects.
     """
     _label = 'Generate structures'
 
