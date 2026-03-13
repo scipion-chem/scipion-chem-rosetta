@@ -55,12 +55,83 @@ from pwchem.utils import cleanPDB
 
 class RosettaProteinPreparation(EMProtocol):
     """
-    This protocol will remove any water, ligand or HETATM that a pdb has and
-    it will remove redundant chains.
+    AI Generated:
 
-    In addition, this protocol will use a Rosetta suite program (named score)
-    to build the missing atoms in the protein, including the hydrogens.
-    This is necessary to subsequently generate the electrostatic potential grid.
+        RosettaProteinPreparation - User Manual
+
+        Overview
+        --------
+        The RosettaProteinPreparation protocol prepares a protein structure for downstream
+        modeling, including electrostatic potential grid calculations. It cleans the input
+        PDB by removing water molecules, ligands (HETATM), and optionally redundant chains.
+        Missing atoms, including hydrogens, are then built using the Rosetta `score` program,
+        producing a physically realistic and complete structure.
+
+        Input Requirements
+        ------------------
+        1. **Atomic Structure**:
+           - Input protein structure in PDB format (`AtomStruct`).
+           - Mandatory input; CIF format is converted to PDB automatically if needed.
+
+        2. **Hydrogen Addition**:
+           - Boolean flag (`addH`) to build missing atoms, including hydrogens.
+           - Required for electrostatic grid generation.
+
+        3. **Cleaning Options**:
+           - **Remove Waters** (`waters`): Remove all water molecules from the PDB.
+           - **Remove Ligands/HETATM** (`HETATM`): Remove ligands and HETATM entries.
+           - **Remove Redundant Chains** (`rchains`): Remove chains not selected for docking.
+           - **Conserved Chain** (`chain_name`): Specify chain(s) to keep when removing redundant chains.
+
+        4. **Advanced Options**:
+           - **Use Constant Seed** (`cseed`): Ensures reproducibility.
+           - **Seed Value** (`seed`): Integer seed value (default: 1111111).
+
+        Workflow
+        --------
+        1. **PDB Cleaning**:
+           - Convert input structure to PDB if required.
+           - Remove waters, ligands, and HETATM entries.
+           - Optionally remove redundant chains, keeping the user-selected conserved chain.
+
+        2. **Missing Atom Addition (Optional)**:
+           - Rosetta `score` program is used to add missing side-chain atoms and hydrogens.
+           - Generates PDB output with complete atoms and a score file detailing energy contributions.
+
+        3. **Output Assembly**:
+           - The final protein structure is stored as an `AtomStruct` object.
+           - Outputs include:
+             - Cleaned PDB file with missing atoms added.
+             - Rosetta score file (.sc) with energetic evaluation of the structure.
+             - Original PDB file retained in the extra folder for reference.
+
+        Outputs
+        -------
+        - **Prepared Protein Structure**: Complete PDB suitable for docking and electrostatic calculations.
+        - **Score File**: Energy evaluation for quality assessment of the protein.
+        - **Extra Folder**: Original and cleaned PDB files for provenance.
+
+        Validation & Warnings
+        ---------------------
+        - Ensure the input PDB file is valid; CIF files are automatically converted but must contain proper chain information.
+        - When removing redundant chains, select the correct conserved chain(s) to avoid accidental deletion.
+        - Rosetta `score` program must be correctly installed and available via `ROSETTA_HOME`.
+        - Constant seed ensures reproducibility; without it, results may vary slightly.
+
+        Practical Recommendations
+        -------------------------
+        - Always review cleaned PDB visually before downstream docking or electrostatic calculations.
+        - Use the hydrogen addition step for all electrostatic calculations or molecular docking workflows.
+        - Retain original PDB files in the extra folder for comparison and troubleshooting.
+        - If dealing with multi-chain symmetric proteins, carefully select conserved chains to prevent accidental loss of important subunits.
+
+        Final Perspective
+        -----------------
+        RosettaProteinPreparation provides a robust and automated workflow to prepare
+        protein structures for modeling applications. By cleaning extraneous molecules,
+        handling missing atoms, and integrating Rosetta’s energy-based assessment, the
+        protocol ensures high-quality protein models suitable for docking, electrostatic
+        calculations, and other structure-based computational experiments.
     """
 
     _label = 'DARC Protein Preparation'
