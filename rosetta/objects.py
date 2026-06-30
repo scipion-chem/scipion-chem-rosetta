@@ -26,6 +26,7 @@
 # **************************************************************************
 
 import math
+from autodock.objects import GridADT
 
 class GridAGD(GridADT):
     """ Represent a grid file in agd (ASCIII) format """
