@@ -45,16 +45,12 @@ from pwchem.utils import splitConformerFile, runOpenBabel, generate_gpf, calcula
 from pwchem import Plugin as pwchem_plugin
 from pwchem.constants import MGL_DIC
 
-#Soft importing autodock for electrostatic grid generation
-ADTGrid = False
-
 import shutil
 import os, re
 import glob
 
 from rosetta import Plugin
 from rosetta.constants import *
-from ..convert import adt2agdGrid
 from rosetta.utils.batchParamsToMol_script import getBatchMolToParamsPath
 
 
@@ -123,16 +119,7 @@ class RosettaProtDARC(EMProtocol):
                            " use as origin points for casting rays. This origin will be"
                            " the center of mass of that residue. ")
 
-        if ADTGrid:
-            group.addParam("use_electro", params.BooleanParam, label="Include electrostatics: ", default=True,
-                           help="Whether to use electrostatics information from a AutoDock grid or use only the shape "
-                                "of the pocket")
-            group.addParam("grid", params.PointerParam, pointerClass="GridADT",
-                          condition="use_electro", label="Input grid: ",
-                          help="Select the AutoDock grid object")
-
-        else:
-            self.use_electro = params.Boolean(False)
+        self.use_electro = params.Boolean(False)
 
         group = form.addGroup('Docking')
         group.addParam('inputSmallMolecules', params.PointerParam, pointerClass="SetOfSmallMolecules",
@@ -205,11 +192,6 @@ class RosettaProtDARC(EMProtocol):
         self._insertFunctionStep('createOutputStep', prerequisites=darcSteps)
 
     def convertInputStep(self):
-        #Converting the ADT grid to the Rosetta agd format
-        if self.use_electro:
-            adtGridName = self.grid.get().getFileName().split('/')[-1]
-            self.agdGrid = adt2agdGrid(self.grid.get(), self._getExtraPath(adtGridName.replace('.e.map', '.agd')))
-
         # Generate params file that DARC will use to dock the ligand in the target protein
         writtenFiles = []
         with open(self._getExtraPath("molfile_list.txt"), "w+") as file:

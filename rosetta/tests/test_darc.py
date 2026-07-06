@@ -56,9 +56,6 @@ class TestImportBase(BaseTest):
       cls._waitOutput(cls.protPrepareLigandRDKit, 'outputSmallMolecules', sleepTime=5)
       cls._waitOutput(cls.protPrepareReceptor, 'outputStructure', sleepTime=5)
 
-      if ADT:
-          cls._runGridGeneration()
-
       cls.pocketProt = cls._runPocketFinder()
       cls._waitOutput(cls.pocketProt, 'outputStructROIs', sleepTime=5)
 
@@ -119,19 +116,7 @@ class TestImportBase(BaseTest):
         cls.proj.launchProtocol(protPocketFinder, wait=False)
         return protPocketFinder
 
-    @classmethod
-    def _runGridGeneration(cls):
-        cls.protGridADT = cls.newProtocol(
-          Autodock_GridGeneration,
-          inputAtomStruct=cls.protPrepareReceptor.outputStructure,
-          radius=24.0,
-          spacing=0.6)
-
-        cls.proj.launchProtocol(cls.protGridADT, wait=False)
-        return cls.protGridADT
-
-
-    def _runDARC(self, ADTLigs=False, pocketsProt=None, gridProt=None):
+    def _runDARC(self, ADTLigs=False, pocketsProt=None):
         if ADTLigs:
             protLigs = self.protPrepareLigandRDKit
         else:
@@ -149,12 +134,7 @@ class TestImportBase(BaseTest):
             protDARC.inputSmallMolecules.set(protLigs)
             protDARC.inputSmallMolecules.setExtended('outputSmallMolecules')
 
-            if gridProt == None:
-                protDARC.use_electro.set(False)
-            else:
-                protDARC.use_electro.set(True)
-                protDARC.grid.set(gridProt)
-                protDARC.grid.setExtended('outputGrid')
+            protDARC.use_electro.set(False)
 
             self.launchProtocol(protDARC)
             self.assertIsNotNone(getattr(protDARC, 'outputSmallMolecules', None))
@@ -170,12 +150,7 @@ class TestImportBase(BaseTest):
             protDARC.inputSmallMolecules.set(protLigs)
             protDARC.inputSmallMolecules.setExtended('outputSmallMolecules')
 
-            if gridProt == None:
-                protDARC.use_electro.set(False)
-            else:
-                protDARC.use_electro.set(True)
-                protDARC.grid.set(gridProt)
-                protDARC.grid.setExtended('outputGrid')
+            protDARC.use_electro.set(False)
 
             self.launchProtocol(protDARC)
             self.assertIsNotNone(getattr(protDARC, 'outputSmallMolecules', None))
@@ -197,22 +172,3 @@ class TestDARC(TestImportBase):
         print("\n Complete Docking from protein pockets and shape only \n")
         protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.pocketProt)
 
-    def test_3(self):
-        """ Complete Docking from whole protein and ADT electrostatics
-        """
-        print("\n Complete Docking from whole protein and ADT electrostatics \n")
-        if ADT:
-            self._waitOutput(self.protGridADT, 'outputGrid', sleepTime=10)
-            protDARC = self._runDARC(ADTLigs=True, gridProt=self.protGridADT)
-        else:
-            print('Autodock cannot be imported, docking with electrostatics cannot be made')
-
-    def test_4(self):
-        """ Complete Docking from protein pockets and ADT electrostatics
-        """
-        print("\n Complete Docking from protein pockets and ADT electrostatics \n")
-        if ADT:
-          protDARC = self._runDARC(gridProt=self.protGridADT,
-                                   pocketsProt=self.pocketProt)
-        else:
-          print('Autodock cannot be imported, docking with electrostatics cannot be made')
