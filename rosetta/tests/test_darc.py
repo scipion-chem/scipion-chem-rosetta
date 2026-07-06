@@ -116,8 +116,8 @@ class TestImportBase(BaseTest):
         cls.proj.launchProtocol(protPocketFinder, wait=False)
         return protPocketFinder
 
-    def _runDARC(self, ADTLigs=False, pocketsProt=None):
-        if ADTLigs:
+    def _runDARC(self, adtLigs=False, pocketsProt=None):
+        if adtLigs:
             protLigs = self.protPrepareLigandRDKit
         else:
             protLigs = self.protOBabel
@@ -170,5 +170,5 @@ class TestDARC(TestImportBase):
         """ Complete Docking from protein pockets and shape only
         """
         print("\n Complete Docking from protein pockets and shape only \n")
-        protDARC = self._runDARC(ADTLigs=ADT, pocketsProt=self.pocketProt)
+        protDARC = self._runDARC(adtLigs=ADT, pocketsProt=self.pocketProt)
 
