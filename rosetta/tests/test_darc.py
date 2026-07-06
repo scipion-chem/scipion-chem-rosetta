@@ -170,5 +170,5 @@ class TestDARC(TestImportBase):
         """ Complete Docking from protein pockets and shape only
         """
         print("\n Complete Docking from protein pockets and shape only \n")
-        protDARC = self._runDARC(adtLigs=ADT, pocketsProt=self.pocketProt)
+        self._runDARC(adtLigs=ADT, pocketsProt=self.pocketProt)
 
