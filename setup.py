@@ -26,7 +26,7 @@ with open('requirements.txt') as f:
 setup(
     name='scipion-chem-rosetta',  # Required
     version='0.1',  # Required
-    description='Scipion plugin in order to use tools provided by Rosetta software suite. Currently it has protocols for the use of the Rosetta DARC docking software',  # Required
+    description='Scipion plugin in order to use tools provided by Rosetta software suite.',  # Required
     long_description=long_description,  # Optional
     url='https://github.com/scipion-chem/scipion-chem-rosetta',  # Optional
     author='Alberto M. Parra-Perez',  # Optional
