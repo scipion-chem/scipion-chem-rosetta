@@ -9,13 +9,13 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@main
-    
+      uses: actions/checkout@12cd2235efa0937479335606d7c3ac9f6c0973b1 # main
+
     - name: Set up MPI
-      uses: mpi4py/setup-mpi@master
-    
+      uses: mpi4py/setup-mpi@3417e34f1394a16723d7913c236642c24e95fd5a # master
+
     - name: Set up Python
-      uses: actions/setup-python@main
+      uses: actions/setup-python@4ab7e95f05e168b4356aebde89dd84f59c283d8e # main
       with:
         python-version: '3.10'
     
@@ -43,13 +43,13 @@ jobs:
     
     - name: Generate tag
       id: tag_version
-      uses: mathieudutour/github-tag-action@v6.2
+      uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         custom_tag: ${{ steps.variables.outputs.TAG_NAME }}
     
     - name: Create a GitHub release
-      uses: ncipollo/release-action@main
+      uses: ncipollo/release-action@3ef8f8ffaf83393fe8e536c7d30f017e058e737d # main
       with:
         tag: ${{ steps.tag_version.outputs.new_tag }}
         name: ${{ steps.variables.outputs.TAG_NAME }}
