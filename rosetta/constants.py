@@ -42,9 +42,6 @@ MAKE_RAY_FILES = 'make_ray_files.static.linuxgccrelease'  # create a ray file to
 MAKE_RAY_FILES_GPU = 'make_ray_files.opencl.linuxgccrelease'  # create a ray file to map the pocket or interface
                                                               # using GPU
 
-DARC = 'DARC.static.linuxgccrelease'      # run DARC
-DARC_GPU = 'DARC.opencl.linuxgccrelease'  # run DARC with GPU
-
 generateStructuresXML = '''<ROSETTASCRIPTS>
 	<SCOREFXNS>
 		<ScoreFunction name="cen" weights="score4_smooth_cart">
