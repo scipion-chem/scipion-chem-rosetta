@@ -237,7 +237,7 @@ class ProtRosettaFlexDDG(EMProtocol):
 
     def createOutputStep(self):
         mutations = self._getMutationsList()
-        outputSet = SetOfStats.create(self.getPath())
+        results = []
 
         for mutation in mutations:
             aaFrom, chain, position, aaTo = mutation
@@ -261,17 +261,37 @@ class ProtRosettaFlexDDG(EMProtocol):
                 print('No successful Flex ddG runs found for mutation %s' % mutName)
                 continue
 
+            results.append({'mutName': mutName, 'ddg': statistics.mean(gamValues),
+                            'ddgRaw': statistics.mean(ddgValues),
+                            'ddgStd': statistics.stdev(gamValues) if len(gamValues) > 1 else 0.0,
+                            'nstruct': len(ddgValues)})
+
+        zscores = self._calculateZScores(results)
+
+        outputSet = SetOfStats.create(self.getPath())
+        for res in results:
             item = Object()
-            item.setObjLabel(label=mutName)
-            item.mutation = String(mutName)
-            item.ddg = Float(statistics.mean(gamValues))
-            item.ddgRaw = Float(statistics.mean(ddgValues))
-            item.ddgStd = Float(statistics.stdev(gamValues) if len(gamValues) > 1 else 0.0)
-            item.nstruct = Float(len(ddgValues))
+            item.setObjLabel(label=res['mutName'])
+            item.mutation = String(res['mutName'])
+            item.ddg = Float(res['ddg'])
+            item.ddgRaw = Float(res['ddgRaw'])
+            item.ddgStd = Float(res['ddgStd'])
+            item.nstruct = Float(res['nstruct'])
+            item.zscore = Float(zscores[res['mutName']])
             outputSet.append(item)
 
         self._defineOutputs(outputStats=outputSet)
         self._defineTransformRelation(self.inputAtomStruct, outputSet)
+
+    def _calculateZScores(self, results):
+        """ Standardizes the ddg (GAM-reweighted) value of each mutation as a z-score over the
+        distribution of ddg values scored in this run. """
+        ddgValues = [res['ddg'] for res in results]
+        avg = statistics.mean(ddgValues)
+        std = statistics.pstdev(ddgValues)
+        if std == 0:
+            return {res['mutName']: 0.0 for res in results}
+        return {res['mutName']: (res['ddg'] - avg) / std for res in results}
 
     # --------------------------- INFO functions -----------------------------------
     def _validate(self):
@@ -365,7 +385,8 @@ class ProtRosettaFlexDDG(EMProtocol):
                        'interactions due to point mutation(s), using the Flex ddG protocol (backrub '
                        'ensemble sampling) implemented in Rosetta.\nThe reported ddg is the GAM-reweighted '
                        'talaris2014 score, as recommended by Barlow et al. 2018; ddgRaw is the unweighted '
-                       'talaris2014 total_score ddG.')
+                       'talaris2014 total_score ddG.\nThe ddg is additionally standardized as a z-score '
+                       'over the set of scored mutations, to allow comparison with other ddG methods.')
         return methods
 
     def _citations(self):
