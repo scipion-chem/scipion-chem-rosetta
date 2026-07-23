@@ -5,3 +5,4 @@
 # **************************************************************************
 
 from .wizard_select_chain import *
+from .wizard_flexDDG import *
