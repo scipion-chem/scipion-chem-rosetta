@@ -28,7 +28,7 @@
 import json
 
 from rosetta.protocols import ProtRosettaFlexDDG
-from rosetta.constants import AA_THREE_TO_ONE
+from rosetta.constants import RESIDUES3TO1
 
 from pwem.wizards import EmWizard
 import pwem.convert as emconv
@@ -118,7 +118,7 @@ class AddMutationsFlexDDG(EmWizard):
                     if chain == self.getchain(form):
                         for pos in range(int(ran[0]), int(ran[1]) + 1):
                             if pos in residues_dict:
-                                aaFrom = AA_THREE_TO_ONE[residues_dict[pos]]
+                                aaFrom = RESIDUES3TO1[residues_dict[pos]]
                                 mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
                                 mutations.append(mutation)
         else:
@@ -135,7 +135,7 @@ class AddMutationsFlexDDG(EmWizard):
                     for ch, residues_dict in chainResidues.items():
                         if ch == chain:
                             if pos in residues_dict:
-                                aaFrom = AA_THREE_TO_ONE[residues_dict[pos]]
+                                aaFrom = RESIDUES3TO1[residues_dict[pos]]
                                 mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
                                 mutations.append(mutation)
 

@@ -342,10 +342,10 @@ class ProtRosettaFlexDDG(EMProtocol):
                                   % (chain, line, ", ".join(validChains)))
                 elif not position.isdigit():
                     errors.append('The position of the mutation "%s" must be an integer.' % line)
-                elif aaFrom not in AA_THREE_TO_ONE.values():
+                elif aaFrom not in RESIDUES3TO1.values():
                     errors.append('The wild-type aminoacid of the mutation "%s" does not exist or is '
                                   'not written with its one-letter code.' % line)
-                elif aaTo != 'X' and aaTo not in AA_THREE_TO_ONE.values():
+                elif aaTo != 'X' and aaTo not in RESIDUES3TO1.values():
                     errors.append('The mutant aminoacid of the mutation "%s" does not exist or is not '
                                   'written with its one-letter code.' % line)
                 else:
@@ -358,12 +358,12 @@ class ProtRosettaFlexDDG(EMProtocol):
                             errors.append('Position "%d" in chain "%s" for mutation "%s" is out of range. '
                                           'The chain "%s" has positions from %s to %s.'
                                           % (intPosition, chain, line, chain, firstResidue, lastResidue))
-                    elif AA_THREE_TO_ONE[residuesDict[intPosition]] != aaFrom:
+                    elif RESIDUES3TO1[residuesDict[intPosition]] != aaFrom:
                         errors.append('The wild-type aminoacid "%s" at position "%d" in chain "%s" for '
                                       'mutation "%s" does not match the PDB file. The aminoacid at that '
                                       'position is %s (%s).'
                                       % (aaFrom, intPosition, chain, line, residuesDict[intPosition],
-                                         AA_THREE_TO_ONE[residuesDict[intPosition]]))
+                                         RESIDUES3TO1[residuesDict[intPosition]]))
 
         program = Plugin.getProgram(ROSETTA_SCRIPTS)
         if not os.path.exists(os.path.expanduser(program)):
