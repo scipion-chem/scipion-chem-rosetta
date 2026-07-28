@@ -67,7 +67,7 @@ class AddMutationsFlexDDG(EmWizard):
         structureHandler = emconv.AtomicStructHandler()
         structureHandler.read(protocol.inputAtomStruct.get().getFileName())
         structureHandler.getStructure()
-        modelsLength, modelsFirstResidue = structureHandler.getModelsChains()
+        _, modelsFirstResidue = structureHandler.getModelsChains()
         chainResidues = {}
 
         for modelID, chains in modelsFirstResidue.items():
@@ -75,9 +75,9 @@ class AddMutationsFlexDDG(EmWizard):
                 if chainID not in chainResidues:
                     chainResidues[chainID] = {}
                 for residue in residues:
-                    res_id = residue[0]
-                    res_type = residue[1]
-                    chainResidues[chainID][res_id] = res_type
+                    resId = residue[0]
+                    resType = residue[1]
+                    chainResidues[chainID][resId] = resType
 
         return chainResidues
 
@@ -88,8 +88,8 @@ class AddMutationsFlexDDG(EmWizard):
 
     def getROIOrigen(self, form):
         protocol = form.protocol
-        ROIOrigin = protocol.ROIOrigin.get()
-        return ROIOrigin
+        roiOrigin = protocol.ROIOrigin.get()
+        return roiOrigin
 
     def getSructROI(self, form):
         protocol = form.protocol
@@ -103,43 +103,41 @@ class AddMutationsFlexDDG(EmWizard):
             return json.loads(chainStr)['chain']
         return None
 
+    def _getMutationsFromRange(self, form, chainResidues, aaTo):
+        chain = self.getchain(form)
+        residuesDict = chainResidues.get(chain, {})
+        mutations = []
+        for ranPos in self.getPositions(form):
+            first, last = ranPos.split("-")
+            for pos in range(int(first), int(last) + 1):
+                if pos in residuesDict:
+                    aaFrom = RESIDUES3TO1[residuesDict[pos]]
+                    mutations.append('{}{}{}{}'.format(aaFrom, chain, pos, aaTo))
+        return mutations
+
+    def _getMutationsFromROI(self, form, chainResidues, aaTo):
+        roiChain = self.getROIChain(form)
+        mutations = []
+        for item in self.getSructROI(form):
+            for roi in item.getDecodedCResidues():
+                chain, pos = roi.split("_")
+                pos = int(pos)
+                if roiChain and chain != roiChain:
+                    continue
+                residuesDict = chainResidues.get(chain, {})
+                if pos in residuesDict:
+                    aaFrom = RESIDUES3TO1[residuesDict[pos]]
+                    mutations.append('{}{}{}{}'.format(aaFrom, chain, pos, aaTo))
+        return mutations
+
     def getMutations(self, form):
         aaTo = self.getaaTo(form)
         chainResidues = self.getchainResidues(form)
-        ROIOrigin = self.getROIOrigen(form)
-        mutations = []
+        roiOrigin = self.getROIOrigen(form)
 
-        if ROIOrigin == 0:
-            allRanPos = self.getPositions(form)
-            chain = self.getchain(form)
-            for ranPos in allRanPos:
-                ran = ranPos.split("-")
-                for chain, residues_dict in chainResidues.items():
-                    if chain == self.getchain(form):
-                        for pos in range(int(ran[0]), int(ran[1]) + 1):
-                            if pos in residues_dict:
-                                aaFrom = RESIDUES3TO1[residues_dict[pos]]
-                                mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
-                                mutations.append(mutation)
-        else:
-            structROI = self.getSructROI(form)
-            roiChain = self.getROIChain(form)
-            for item in structROI:
-                chain_res = item.getDecodedCResidues()
-                for roi in chain_res:
-                    res = roi.split("_")
-                    chain = res[0]
-                    pos = int(res[1])
-                    if roiChain and chain != roiChain:
-                        continue
-                    for ch, residues_dict in chainResidues.items():
-                        if ch == chain:
-                            if pos in residues_dict:
-                                aaFrom = RESIDUES3TO1[residues_dict[pos]]
-                                mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
-                                mutations.append(mutation)
-
-        return mutations
+        if roiOrigin == 0:
+            return self._getMutationsFromRange(form, chainResidues, aaTo)
+        return self._getMutationsFromROI(form, chainResidues, aaTo)
 
     def show(self, form, *params):
         protocol = form.protocol

@@ -53,7 +53,8 @@ import pwem.convert as emconv
 from pwchem.utils import cleanPDB
 
 from rosetta import Plugin
-from rosetta.constants import *
+from rosetta.constants import (RESIDUES3TO1, ROSETTA_SCRIPTS, FLEXDDG_XML_FILE, flexDDGXML,
+                               FLEXDDG_RESFILE, FLEXDDG_DB_FILE, FLEXDDG_GAM_PARAMS, CANONICAL_AAS)
 
 
 class ProtRosettaFlexDDG(EMProtocol):
@@ -170,7 +171,7 @@ class ProtRosettaFlexDDG(EMProtocol):
                        help='Maximum allowed change in total score after minimization. If exceeded, '
                             'another minimization cycle is run. The benchmarked value is 1.0.')
 
-        form.addParallelSection(threads=16, mpi=1)
+        form.addParallelSection(threads=4, mpi=1)
 
     # --------------------------- STEPS functions ------------------------------
     def _insertAllSteps(self):
@@ -295,81 +296,99 @@ class ProtRosettaFlexDDG(EMProtocol):
 
     # --------------------------- INFO functions -----------------------------------
     def _validate(self):
+        validChains, chainResidues = self._getValidChainsAndResidues()
+
         errors = []
-
-        structureHandler = emconv.AtomicStructHandler()
-        structureHandler.read(self.inputAtomStruct.get().getFileName())
-        structureHandler.getStructure()
-        modelsLength, modelsFirstResidue = structureHandler.getModelsChains()
-
-        validChains = set()
-        chainResidues = {}
-        for modelID, chains in modelsFirstResidue.items():
-            for chainID, residues in chains.items():
-                filteredResidues = [res for res in residues if res[1] != 'HOH']
-                validChains.add(chainID)
-                if chainID not in chainResidues:
-                    chainResidues[chainID] = filteredResidues
-
-        if not self.chainsToMove.get() or not self.chainsToMove.get().strip():
-            errors.append('You must specify the chain(s) that define one side of the interface '
-                          '("Chain(s) defining one side of the interface").')
-        else:
-            for ch in self._getChainsToMove().split(','):
-                if ch.strip() not in validChains:
-                    errors.append('Chain "%s" (from "Chain(s) defining one side of the interface") is '
-                                  'not present in the PDB file. The PDB file contains the following '
-                                  'chains: %s.' % (ch.strip(), ", ".join(sorted(validChains))))
-
-        if not self.toMutateList.get().strip():
-            errors.append('You have not added any mutation to the list. Do so using the "Add defined '
-                          'mutations" wizard once you have defined it.')
-        else:
-            for line in self.toMutateList.get().strip().split('\n'):
-                line = line.strip()
-                if not line:
-                    continue
-                match = self._mutationPattern().match(line)
-                if not match:
-                    errors.append('The mutation "%s" does not have the 4 necessary parameters. '
-                                  'Mutation format must be "[aaFrom][Chain][Position][aaTo]".' % line)
-                    continue
-
-                aaFrom, chain, position, aaTo = match.groups()
-                if chain not in validChains:
-                    errors.append('The chain "%s" of the mutation "%s" is not present in the PDB file. '
-                                  'The PDB file contains the following chains: %s.'
-                                  % (chain, line, ", ".join(validChains)))
-                elif not position.isdigit():
-                    errors.append('The position of the mutation "%s" must be an integer.' % line)
-                elif aaFrom not in RESIDUES3TO1.values():
-                    errors.append('The wild-type aminoacid of the mutation "%s" does not exist or is '
-                                  'not written with its one-letter code.' % line)
-                elif aaTo != 'X' and aaTo not in RESIDUES3TO1.values():
-                    errors.append('The mutant aminoacid of the mutation "%s" does not exist or is not '
-                                  'written with its one-letter code.' % line)
-                else:
-                    intPosition = int(position)
-                    residuesDict = {res[0]: res[1] for res in chainResidues.get(chain, [])}
-                    if intPosition not in residuesDict:
-                        if residuesDict:
-                            firstResidue = next(iter(residuesDict))
-                            lastResidue = list(residuesDict)[-1]
-                            errors.append('Position "%d" in chain "%s" for mutation "%s" is out of range. '
-                                          'The chain "%s" has positions from %s to %s.'
-                                          % (intPosition, chain, line, chain, firstResidue, lastResidue))
-                    elif RESIDUES3TO1[residuesDict[intPosition]] != aaFrom:
-                        errors.append('The wild-type aminoacid "%s" at position "%d" in chain "%s" for '
-                                      'mutation "%s" does not match the PDB file. The aminoacid at that '
-                                      'position is %s (%s).'
-                                      % (aaFrom, intPosition, chain, line, residuesDict[intPosition],
-                                         RESIDUES3TO1[residuesDict[intPosition]]))
+        errors.extend(self._validateChainsToMove(validChains))
+        errors.extend(self._validateMutationList(validChains, chainResidues))
 
         program = Plugin.getProgram(ROSETTA_SCRIPTS)
         if not os.path.exists(os.path.expanduser(program)):
             errors.append('Cannot find Rosetta rosetta_scripts binary: %s' % program)
 
         return errors
+
+    def _getValidChainsAndResidues(self):
+        structureHandler = emconv.AtomicStructHandler()
+        structureHandler.read(self.inputAtomStruct.get().getFileName())
+        structureHandler.getStructure()
+        _, modelsFirstResidue = structureHandler.getModelsChains()
+
+        validChains = set()
+        chainResidues = {}
+        for chains in modelsFirstResidue.values():
+            for chainID, residues in chains.items():
+                filteredResidues = [res for res in residues if res[1] != 'HOH']
+                validChains.add(chainID)
+                if chainID not in chainResidues:
+                    chainResidues[chainID] = filteredResidues
+        return validChains, chainResidues
+
+    def _validateChainsToMove(self, validChains):
+        if not self.chainsToMove.get() or not self.chainsToMove.get().strip():
+            return ['You must specify the chain(s) that define one side of the interface '
+                    '("Chain(s) defining one side of the interface").']
+
+        errors = []
+        for ch in self._getChainsToMove().split(','):
+            if ch.strip() not in validChains:
+                errors.append('Chain "%s" (from "Chain(s) defining one side of the interface") is '
+                              'not present in the PDB file. The PDB file contains the following '
+                              'chains: %s.' % (ch.strip(), ", ".join(sorted(validChains))))
+        return errors
+
+    def _validateMutationList(self, validChains, chainResidues):
+        if not self.toMutateList.get().strip():
+            return ['You have not added any mutation to the list. Do so using the "Add defined '
+                    'mutations" wizard once you have defined it.']
+
+        errors = []
+        for line in self.toMutateList.get().strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            errors.extend(self._validateMutationLine(line, validChains, chainResidues))
+        return errors
+
+    def _validateMutationLine(self, line, validChains, chainResidues):
+        match = self._mutationPattern().match(line)
+        if not match:
+            return ['The mutation "%s" does not have the 4 necessary parameters. '
+                    'Mutation format must be "[aaFrom][Chain][Position][aaTo]".' % line]
+
+        aaFrom, chain, position, aaTo = match.groups()
+        if chain not in validChains:
+            return ['The chain "%s" of the mutation "%s" is not present in the PDB file. '
+                    'The PDB file contains the following chains: %s.'
+                    % (chain, line, ", ".join(validChains))]
+        if not position.isdigit():
+            return ['The position of the mutation "%s" must be an integer.' % line]
+        if aaFrom not in RESIDUES3TO1.values():
+            return ['The wild-type aminoacid of the mutation "%s" does not exist or is '
+                    'not written with its one-letter code.' % line]
+        if aaTo != 'X' and aaTo not in RESIDUES3TO1.values():
+            return ['The mutant aminoacid of the mutation "%s" does not exist or is not '
+                    'written with its one-letter code.' % line]
+
+        return self._validateMutationPosition(line, chain, int(position), aaFrom, chainResidues)
+
+    def _validateMutationPosition(self, line, chain, intPosition, aaFrom, chainResidues):
+        residuesDict = {res[0]: res[1] for res in chainResidues.get(chain, [])}
+        if intPosition not in residuesDict:
+            if not residuesDict:
+                return []
+            firstResidue = next(iter(residuesDict))
+            lastResidue = list(residuesDict)[-1]
+            return ['Position "%d" in chain "%s" for mutation "%s" is out of range. '
+                    'The chain "%s" has positions from %s to %s.'
+                    % (intPosition, chain, line, chain, firstResidue, lastResidue)]
+        if RESIDUES3TO1[residuesDict[intPosition]] != aaFrom:
+            return ['The wild-type aminoacid "%s" at position "%d" in chain "%s" for '
+                    'mutation "%s" does not match the PDB file. The aminoacid at that '
+                    'position is %s (%s).'
+                    % (aaFrom, intPosition, chain, line, residuesDict[intPosition],
+                       RESIDUES3TO1[residuesDict[intPosition]])]
+        return []
 
     def _summary(self):
         summary = []
@@ -422,7 +441,7 @@ class ProtRosettaFlexDDG(EMProtocol):
         return value
 
     def _mutationPattern(self):
-        return re.compile(r'([A-Za-z]+)([A-Za-z]+)([^a-zA-Z]+)([A-Za-z]+)')
+        return re.compile(r'([A-Za-z])([A-Za-z]+)([0-9]+)([A-Za-z]+)')
 
     def _getMutationsList(self):
         """ Parses self.toMutateList into a deduplicated list of (aaFrom, chain, position, aaTo)
@@ -455,7 +474,7 @@ class ProtRosettaFlexDDG(EMProtocol):
         return self._getExtraPath(mutName, '%02d' % structIdx)
 
     def _writeResfile(self, resfile, mutation):
-        aaFrom, chain, position, aaTo = mutation
+        _, chain, position, aaTo = mutation
         with open(resfile, 'w') as f:
             f.write('NATAA\nstart\n%d %s PIKAA %s\n' % (position, chain, aaTo))
 
