@@ -441,7 +441,7 @@ class ProtRosettaFlexDDG(EMProtocol):
         return value
 
     def _mutationPattern(self):
-        return re.compile(r'([A-Za-z])([A-Za-z]+)([0-9]+)([A-Za-z]+)')
+        return re.compile(r'([A-Za-z])([A-Za-z]+)(\d+)([A-Za-z]+)')
 
     def _getMutationsList(self):
         """ Parses self.toMutateList into a deduplicated list of (aaFrom, chain, position, aaTo)
