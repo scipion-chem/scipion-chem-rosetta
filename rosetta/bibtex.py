@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # **************************************************************************
 # *
-# * Authors:     you (you@yourinstitution.email)
+# * Authors:     Judith Maestro Ciria
 # *
-# * your institution
+# * Biocomputing Unit, CNB-CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -50,5 +50,18 @@
    Number="487",
    Pages="545--574"
    doi= "https://doi.org/10.1016/B978-0-12-381270-4.00019-6"
+}
+
+@Article{Barlow2018,
+   Author="Barlow, Kyle A. and {\'O} Conch{\'u}ir, Shane and Thompson, Samuel and Suresh, Pooja and Lucas, James E.
+    and Heinonen, Markus and Kortemme, Tanja",
+   Title="{Flex ddG: Rosetta Ensemble-Based Estimation of Changes in Protein-Protein Binding Affinity upon Mutation}",
+   Journal="J Phys Chem B",
+   Year="2018",
+   Volume="122",
+   Number="21",
+   Pages="5389--5399",
+   Month="Feb",
+   doi= "https://doi.org/10.1021/acs.jpcb.7b11367"
 }
 """

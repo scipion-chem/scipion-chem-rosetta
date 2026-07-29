@@ -26,3 +26,4 @@
 
 from rosetta.tests.test_target_preparation import *
 from rosetta.tests.test_generate_structures import *
+from rosetta.tests.test_flexDDG import *
