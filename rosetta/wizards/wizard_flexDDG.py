@@ -107,17 +107,22 @@ class AddMutationsFlexDDG(EmWizard):
         chain = self.getchain(form)
         residuesDict = chainResidues.get(chain, {})
         mutations = []
+        seen = set()
         for ranPos in self.getPositions(form):
             first, last = ranPos.split("-")
             for pos in range(int(first), int(last) + 1):
                 if pos in residuesDict:
                     aaFrom = RESIDUES3TO1[residuesDict[pos]]
-                    mutations.append('{}{}{}{}'.format(aaFrom, chain, pos, aaTo))
+                    mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
+                    if mutation not in seen:
+                        seen.add(mutation)
+                        mutations.append(mutation)
         return mutations
 
     def _getMutationsFromROI(self, form, chainResidues, aaTo):
         roiChain = self.getROIChain(form)
         mutations = []
+        seen = set()
         for item in self.getSructROI(form):
             for roi in item.getDecodedCResidues():
                 chain, pos = roi.split("_")
@@ -127,7 +132,10 @@ class AddMutationsFlexDDG(EmWizard):
                 residuesDict = chainResidues.get(chain, {})
                 if pos in residuesDict:
                     aaFrom = RESIDUES3TO1[residuesDict[pos]]
-                    mutations.append('{}{}{}{}'.format(aaFrom, chain, pos, aaTo))
+                    mutation = '{}{}{}{}'.format(aaFrom, chain, pos, aaTo)
+                    if mutation not in seen:
+                        seen.add(mutation)
+                        mutations.append(mutation)
         return mutations
 
     def getMutations(self, form):
@@ -144,7 +152,9 @@ class AddMutationsFlexDDG(EmWizard):
         mutations = self.getMutations(form)
 
         toMutateList = protocol.toMutateList.get()
-        toMutateList += "\n" + "\n".join(mutations)
+        existing = set(line.strip() for line in toMutateList.strip().split("\n") if line.strip())
+        newMutations = [m for m in mutations if m not in existing]
+        toMutateList += "\n" + "\n".join(newMutations)
         form.setVar('toMutateList', toMutateList.strip())
 
 
