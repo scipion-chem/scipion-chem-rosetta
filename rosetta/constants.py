@@ -48,7 +48,7 @@ ROSETTA_SCRIPTS_GPU = 'rosetta_scripts.opencl.linuxgccrelease'
 
 
 # ------------------------------------ Flex ddG ------------------------------------
-from pwchem.utils.utils import RESIDUES3TO1
+from pwchem.wizards.wizard_add_mutations import AA_THREE_TO_ONE as RESIDUES3TO1
 
 CANONICAL_AAS = 'ACDEFGHIKLMNPQRSTVWY'
 
