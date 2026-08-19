@@ -6,6 +6,6 @@
 
 
 from .protocol_target_preparation import RosettaProteinPreparation
-from .protocol_darc import RosettaProtDARC
 from .protocol_generate_structures import ProtRosettaGenerateStructures
+from .protocol_flexDDG import ProtRosettaFlexDDG
 

@@ -25,23 +25,3 @@
 # *
 # **************************************************************************
 
-import math
-
-class GridAGD(GridADT):
-    """ Represent a grid file in agd (ASCIII) format """
-    def __init__(self, filename=None, **kwargs):
-        super().__init__(filename, **kwargs)
-        if filename != None:
-            self.parseFile()
-
-    def parseFile(self):
-        with open(self.getFileName()) as f:
-            for line in f:
-                if line.startswith('Mid:'):
-                    self.setMassCenter(list(map(float, line.split()[1:])))
-                elif line.startswith('Dim:'):
-                    npts=float(line.split()[1])
-                    self.setNumberOfPoints(npts)
-                elif line.startswith('Spacing:'):
-                    self.setSpacing(float(line.split()[1]))
-        self.setRadius(math.sqrt(npts * self.getSpacing()))
