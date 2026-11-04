@@ -22,10 +22,19 @@ with open('requirements.txt') as f:
 
 # Arguments marked as "Required" below must be included for upload to PyPI.
 # Fields marked as "Optional" may be commented out.
+VERSION_FILE = os.path.join(here, "rosetta", "version.py")
+
+def get_version():
+    with open(VERSION_FILE, "r") as f:
+        content = f.read()
+    match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', content, re.M)
+    if not match:
+        raise RuntimeError(f"Unable to find version string in {VERSION_FILE}")
+    return match.group(1)
 
 setup(
     name='scipion-chem-rosetta',  # Required
-    version='0.1',  # Required
+    version=get_version(),  # Required
     description='Scipion plugin in order to use tools provided by Rosetta software suite.',  # Required
     long_description=long_description,  # Optional
     url='https://github.com/scipion-chem/scipion-chem-rosetta',  # Optional
